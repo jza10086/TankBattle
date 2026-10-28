@@ -11,7 +11,7 @@ const BattleModel = preload("res://scripts/battle.gd")
 const DEFAULT_PORT := 7777
 const MAX_PLAYERS := 8
 const MAX_TEAM := 4
-const PROTOCOL := 1
+const PROTOCOL := 2 # Rectangular 736 × 416 terrain encoding; reject older square-world peers.
 const SNAPSHOT_INTERVAL := 3 # 60 Hz / 3 = 20 snapshots / second.
 const INPUT_TIMEOUT_MS := 300
 const CONNECT_TIMEOUT_MS := 8000

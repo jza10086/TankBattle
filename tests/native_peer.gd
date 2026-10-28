@@ -38,7 +38,7 @@ func run() -> void:
 				saw_match = true
 			var elapsed := (Time.get_ticks_msec() - phase_started) / 1000.0
 			# Up + fire for the opening, then hold position and continue firing.
-			scene.net.submit_input(0 if elapsed < 1.4 else -1, elapsed < 5.0)
+			scene.net.submit_input(0 if elapsed < 1.7 else -1, elapsed < 5.0)
 		elif scene.net.mode == "offline":
 			print("NATIVE PEER EXIT: ", scene.net.reason, " saw_match=", saw_match)
 			quit(0 if saw_match else 1)

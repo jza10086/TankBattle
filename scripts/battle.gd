@@ -4,7 +4,13 @@ extends RefCounted
 ## Pure authoritative combat model. No AI, scene tree, input device or networking.
 ## Timers use exact 60 Hz ticks; the renderer receives seconds for UI only.
 const TILE := 32
-const SIZE := 416
+const WIDTH := 736
+const HEIGHT := 416
+const COLUMNS := WIDTH / TILE
+const ROWS := HEIGHT / TILE
+const TERRAIN_COLUMNS := WIDTH / 16
+const TERRAIN_ROWS := HEIGHT / 16
+const CENTER_OFFSET := 160
 const HALF := 12.0
 const TICK_RATE := 60
 const STEP := 1.0 / TICK_RATE
@@ -22,21 +28,24 @@ const BASE_INVULNERABILITY := 1.0
 const BASE_SHIELD_TICKS := ceili(BASE_INVULNERABILITY * TICK_RATE)
 const DIRS := [Vector2.UP, Vector2.RIGHT, Vector2.DOWN, Vector2.LEFT]
 # Both horizontal and vertical mirrors: same cover, travel distance and spawn space.
+# The original center is unchanged; five playable columns are added at each
+# side. North/south and east/west mirrors give both teams identical wing routes.
 const MAP := [
-	".....B.B.....",
-	".....BBB.....",
-	".BB.B...B.BB.",
-	".GG...S...GG.",
-	".GG.B...B.GG.",
-	"....WW.WW....",
-	".BB..S.S..BB.",
-	"....WW.WW....",
-	".GG.B...B.GG.",
-	".GG...S...GG.",
-	".BB.B...B.BB.",
-	".....BBB.....",
-	".....B.B....."
+	"..........B.B..........",
+	".BBB......BBB......BBB.",
+	"...B..BB.B...B.BB..B...",
+	".G....GG...S...GG....G.",
+	".G.S..GG.B...B.GG..S.G.",
+	"...W.....WW.WW.....W...",
+	".B....BB..S.S..BB....B.",
+	"...W.....WW.WW.....W...",
+	".G.S..GG.B...B.GG..S.G.",
+	".G....GG...S...GG....G.",
+	"...B..BB.B...B.BB..B...",
+	".BBB......BBB......BBB.",
+	"..........B.B.........."
 ]
+
 var state := "lobby"
 var winner := -1 # 0 red, 1 blue, 2 simultaneous destruction / draw.
 var elapsed := 0.0
@@ -57,9 +66,9 @@ func _init() -> void:
 
 func _load_terrain() -> void:
 	terrain.clear()
-	for y in range(13):
-		assert(MAP[y].length() == 13)
-		for x in range(13):
+	for y in range(ROWS):
+		assert(MAP[y].length() == COLUMNS)
+		for x in range(COLUMNS):
 			var kind: String = MAP[y].substr(x, 1)
 			if kind in ["B", "S", "W", "G"]:
 				for oy in range(2):
@@ -70,7 +79,7 @@ func _reset_bases() -> void:
 	bases.clear()
 	for team in range(2):
 		bases.append({"team": team, "hp": BASE_HP, "shield": 0.0,
-			"shield_until": 0, "pos": Vector2(192, 0 if team == 0 else 384)})
+			"shield_until": 0, "pos": Vector2((WIDTH - TILE) / 2, 0 if team == 0 else HEIGHT - TILE)})
 
 func reset(roster: Dictionary) -> void:
 	state = "playing"
@@ -110,7 +119,7 @@ func spawn_points(team: int) -> Array[Vector2]:
 	# Wide lanes avoid spawning teammates nose-to-tail. Secondary positions are safe fallbacks.
 	for y in [16, 48]:
 		for x in [48, 368, 112, 304, 16, 400, 80, 336]:
-			result.append(Vector2(x, y if team == 0 else SIZE - y))
+			result.append(Vector2(x + CENTER_OFFSET, y if team == 0 else HEIGHT - y))
 	return result
 
 func try_respawn(id: int) -> bool:
@@ -190,7 +199,7 @@ func tank_rect(pos: Vector2) -> Rect2:
 
 func can_occupy(pos: Vector2, ignore_id: int = -1, include_tanks: bool = true) -> bool:
 	var rect := tank_rect(pos)
-	if rect.position.x < 0 or rect.position.y < 0 or rect.end.x > SIZE or rect.end.y > SIZE:
+	if rect.position.x < 0 or rect.position.y < 0 or rect.end.x > WIDTH or rect.end.y > HEIGHT:
 		return false
 	for team in range(2):
 		if rect.intersects(base_rect(team)):
@@ -255,7 +264,7 @@ func update_bullets(dt: float) -> void:
 				continue
 			b.pos += DIRS[b.dir] * b.speed * dt / steps
 			var p: Vector2 = b.pos
-			if p.x < 0 or p.y < 0 or p.x >= SIZE or p.y >= SIZE:
+			if p.x < 0 or p.y < 0 or p.x >= WIDTH or p.y >= HEIGHT:
 				b.dead = true
 				continue
 			var rect := Rect2(p - Vector2(2, 2), Vector2(4, 4))
@@ -360,16 +369,16 @@ func add_explosion(pos: Vector2, radius: float) -> void:
 
 func _pack_terrain() -> PackedByteArray:
 	var packed := PackedByteArray()
-	packed.resize(26 * 26)
+	packed.resize(TERRAIN_COLUMNS * TERRAIN_ROWS)
 	for cell in terrain:
-		packed[cell.y * 26 + cell.x] = ["", "B", "S", "W", "G"].find(terrain[cell])
+		packed[cell.y * TERRAIN_COLUMNS + cell.x] = ["", "B", "S", "W", "G"].find(terrain[cell])
 	return packed
 
 func _unpack_terrain(packed: PackedByteArray) -> void:
 	terrain.clear()
-	for i in range(mini(packed.size(), 26 * 26)):
+	for i in range(mini(packed.size(), TERRAIN_COLUMNS * TERRAIN_ROWS)):
 		if packed[i] > 0 and packed[i] <= 4:
-			terrain[Vector2i(i % 26, i / 26)] = ["", "B", "S", "W", "G"][packed[i]]
+			terrain[Vector2i(i % TERRAIN_COLUMNS, i / TERRAIN_COLUMNS)] = ["", "B", "S", "W", "G"][packed[i]]
 
 func snapshot() -> Dictionary:
 	return {"state": state, "winner": winner, "elapsed": elapsed, "tick": tick,

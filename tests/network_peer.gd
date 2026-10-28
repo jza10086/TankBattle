@@ -25,6 +25,7 @@ var saw_respawn := false
 var saw_base_hit := false
 var saw_base_shield := false
 var saw_bullet := false
+var saw_wing_position := false
 var saw_terrain_change := false
 var terrain_count := 0
 var snapshot_count := 0
@@ -95,9 +96,15 @@ func _snapshot() -> void:
 	var digest := encoded.hex_encode().sha256_text()
 	print("SNAP %d %d %s" % [net.epoch, net.game.tick, digest])
 	seen_epochs[net.epoch] = true
-	if terrain_count == 0: terrain_count = net.game.terrain.size()
+	if terrain_count == 0:
+		terrain_count = net.game.terrain.size()
+		check(data.terrain.size() == net.game.TERRAIN_COLUMNS * net.game.TERRAIN_ROWS, "snapshot has complete rectangular terrain dimensions")
+		check(net.game.bases[0].pos.x == 352 and net.game.bases[1].pos.x == 352, "replicated bases use shared wide-world coordinates")
 	if net.game.terrain.size() < terrain_count: saw_terrain_change = true
 	if net.game.bullets.size() > 0: saw_bullet = true
+	for tank in net.game.tanks:
+		if tank.pos.x > net.game.WIDTH - 32:
+			saw_wing_position = true
 	if net.game.bases[0].hp < 5: saw_base_hit = true
 	if net.game.bases[0].shield > 0: saw_base_shield = true
 	for player in net.game.players.values():
@@ -171,13 +178,13 @@ func _host_step() -> void:
 			once.flight = true
 			# Test-only fixture gives a long clear firing lane independent of random peer-ID spawn ordering.
 			var flying_tank: Dictionary = net.game.tank_for(opponent_id)
-			flying_tank.pos = Vector2(208, 208)
+			flying_tank.pos = Vector2(net.game.WIDTH / 2, net.game.HEIGHT / 2)
 			flying_tank.dir = 0
 		if tick >= 180 and not once.has("target"):
 			once.target = true
 			# Test-only fixture: the selected blue human shoots the red base through its brick cover.
 			var tank: Dictionary = net.game.tank_for(opponent_id)
-			tank.pos = Vector2(208, 80)
+			tank.pos = Vector2(net.game.WIDTH / 2, 80)
 			tank.shield_until = 0
 			tank.dir = 0
 		if tick >= 300 and not once.has("kill"):
@@ -190,7 +197,15 @@ func _host_step() -> void:
 			check(not net.game.tank_for(opponent_id).is_empty(), "player respawned after two seconds")
 			check(net.game.tank_for(opponent_id).shield > 0, "respawn invulnerability active")
 			check(net.game.players[opponent_id].deaths == 1 and net.game.players[1].kills == 1, "authoritative scores recorded")
-		if tick >= 450:
+		if tick >= 430 and not once.has("wing"):
+			once.wing = true
+			# A separate long-lived firing observation in the new outer corridor
+			# checks coordinates beyond the old square and lets slow-starting peers
+			# observe bullets after the short base-cover impact sequence.
+			var wing_tank: Dictionary = net.game.tank_for(opponent_id)
+			wing_tank.pos = Vector2(net.game.WIDTH - 16, net.game.HEIGHT - 96)
+			wing_tank.dir = 0
+		if tick >= 510:
 			# Test-only fixture: finish after all replication observations; production victory path is unchanged.
 			net.game.bases[0].hp = 1
 			net.game.bases[0].shield_until = 0
@@ -201,6 +216,7 @@ func _host_step() -> void:
 		end_at = Time.get_ticks_msec()
 		phase = 4
 	if phase == 4 and Time.get_ticks_msec() - end_at > 700:
+		check(saw_wing_position, "client-authorized movement and shots replicate in far playable wing")
 		check(saw_bullet and saw_base_hit and saw_base_shield and saw_death and saw_respawn and saw_terrain_change, "host saw fields: bullet=%s base=%s shield=%s death=%s respawn=%s terrain=%s" % [saw_bullet, saw_base_hit, saw_base_shield, saw_death, saw_respawn, saw_terrain_change])
 		net.return_to_lobby()
 		phase = 5
@@ -247,7 +263,7 @@ func _client_step() -> void:
 		var tick: int = net.game.tick
 		var first_match: bool = net.epoch == 1
 		var direction := 1 if _is_shooter() and first_match and tick < 45 else -1
-		var firing := _is_shooter() and first_match and ((tick >= 20 and tick < 40) or (tick >= 160 and tick < 175) or (tick >= 180 and tick < 300))
+		var firing := _is_shooter() and first_match and ((tick >= 20 and tick < 40) or (tick >= 160 and tick < 175) or (tick >= 180 and tick < 300) or (tick >= 440 and tick < 500))
 		if firing and tick >= 160: direction = 0
 		net.submit_input(direction, firing)
 		if _is_shooter() and first_match and tick >= 90 and not sent_attack:
@@ -268,5 +284,6 @@ func _client_step() -> void:
 		check("host" in net.reason.to_lower(), "host loss returns to entry with clear reason: " + net.reason)
 		check(seen_epochs.size() == 2, "client received rematch epoch")
 		check(snapshot_count > 30, "client received continuous authoritative snapshots")
+		check(saw_wing_position, "client-authorized movement and shots replicate in far playable wing")
 		check(saw_bullet and saw_base_hit and saw_base_shield and saw_death and saw_respawn and saw_terrain_change, "client saw fields: bullet=%s base=%s shield=%s death=%s respawn=%s terrain=%s" % [saw_bullet, saw_base_hit, saw_base_shield, saw_death, saw_respawn, saw_terrain_change])
 		finish()

@@ -9,6 +9,7 @@ const ROSTER := {1: {"name": "Red", "team": 0}, 2: {"name": "Blue", "team": 1}}
 func _initialize() -> void:
 	test_reset_and_map()
 	test_spawn_reachability()
+	test_wide_world()
 	test_terrain_collision()
 	test_projectiles_and_teams()
 	test_base_invulnerability()
@@ -64,9 +65,9 @@ func test_reset_and_map() -> void:
 	check(b.tank_for(1).pos.y == 16 and b.tank_for(2).pos.y == 400, "red top and blue bottom spawn")
 	check(b.tank_for(1).shield == 2.0 and b.tank_for(2).shield == 2.0, "both initial players receive shield")
 	var symmetric := true
-	for y in range(13):
-		for x in range(13):
-			if Model.MAP[y][x] != Model.MAP[12-y][x] or Model.MAP[y][x] != Model.MAP[y][12-x]:
+	for y in range(Model.ROWS):
+		for x in range(Model.COLUMNS):
+			if Model.MAP[y][x] != Model.MAP[Model.ROWS-1-y][x] or Model.MAP[y][x] != Model.MAP[y][Model.COLUMNS-1-x]:
 				symmetric = false
 	check(symmetric, "arena has identical horizontal and vertical mirror geometry")
 	for team in range(2):
@@ -84,7 +85,7 @@ func test_spawn_reachability() -> void:
 		if b.terrain[cell] == "B":
 			b.terrain.erase(cell)
 	for team in range(2):
-		var goal := Vector2i(6, 11 if team == 0 else 1)
+		var goal := Vector2i(Model.COLUMNS / 2, Model.ROWS - 2 if team == 0 else 1)
 		var queue: Array[Vector2i] = [goal]
 		var seen := {goal: true}
 		var index := 0
@@ -102,6 +103,56 @@ func test_spawn_reachability() -> void:
 			var spawn_cell := Vector2i(point / 32)
 			check(seen.has(spawn_cell), "team %d spawn %d can reach enemy base attack lane after brick breach" % [team, i])
 
+func test_wide_world() -> void:
+	var b = fresh(true)
+	check(Model.WIDTH == 736 and Model.HEIGHT == 416, "all peers share fixed 736 by 416 world dimensions")
+	check(b.bases[0].pos.x == 352 and b.bases[1].pos.x == 352, "both bases remain centered in widened arena")
+	check(b.spawn_points(0)[0] == Vector2(208, 16) and b.spawn_points(1)[0] == Vector2(208, 400), "original spawn geometry shifts equally by 160 pixels")
+	check(not b.can_occupy(Vector2(40, 5)) and not b.can_occupy(Vector2(40, Model.HEIGHT - 4)), "height remains independent from widened horizontal bounds")
+	check(b.can_occupy(Vector2(500, 200)) and b.can_occupy(Vector2(720, 200)), "right wing is authoritative playable space, not decorative fill")
+	var tank: Dictionary = b.spawn_tank(1, Vector2(410, 200), 0, 0)
+	check(b.move_tank(tank, Vector2(20, 0)) and tank.pos.x == 430, "tank crosses old square width without invisible wall")
+	check(not b.move_tank(tank, Vector2(400, 0)), "tank cannot cross new right world edge")
+	b.bullets.append(bullet(Vector2(410, 150), 1))
+	b.update_bullets(0.05)
+	check(b.bullets.size() == 1 and b.bullets[0].pos.x > 416, "projectile crosses old square width")
+	b.bullets.clear()
+	b.bullets.append(bullet(Vector2(Model.WIDTH - 2, 150), 1))
+	b.update_bullets(0.05)
+	check(b.bullets.is_empty(), "projectile expires at rectangular right edge")
+	b.tanks.clear()
+	b._load_terrain()
+	var outer_terrain := 0
+	for cell in b.terrain:
+		if cell.x < 10 or cell.x >= 36:
+			outer_terrain += 1
+	check(outer_terrain > 80, "both new playable wings contain authoritative cover")
+	# Without destroying anything, the two outer lanes connect to the center on
+	# both ends and can reach one another through the middle crossing.
+	var start := Vector2i(0, 0)
+	var queue: Array[Vector2i] = [start]
+	var seen := {start: true}
+	var index := 0
+	while index < queue.size():
+		var current: Vector2i = queue[index]
+		index += 1
+		for direction in Model.DIRS:
+			var cell := current + Vector2i(direction)
+			if seen.has(cell) or not b.can_occupy(Vector2(cell * 32) + Vector2(16, 16), -1, false):
+				continue
+			seen[cell] = true
+			queue.append(cell)
+	for cell in [Vector2i(0, 12), Vector2i(22, 0), Vector2i(22, 12), Vector2i(11, 6), Vector2i(5, 0), Vector2i(17, 12)]:
+		check(seen.has(cell), "wide-world open route reaches %s without destroying cover" % cell)
+	# Explicit sentinels at both extreme columns detect a stale square stride.
+	b.terrain[Vector2i(0, 25)] = "W"
+	b.terrain[Vector2i(45, 25)] = "B"
+	var snap: Dictionary = b.snapshot()
+	var client = Model.new()
+	client.apply_snapshot(snap)
+	check(client.terrain == b.terrain and client.terrain[Vector2i(45, 25)] == "B", "full terrain round trip preserves far wing cells and row stride")
+
+
 func test_terrain_collision() -> void:
 	var b = fresh(true)
 	for kind in ["B", "S", "W", "G"]:
@@ -109,8 +160,8 @@ func test_terrain_collision() -> void:
 		wall(b, Vector2i(2, 2), kind)
 		check(b.can_occupy(Vector2(80, 80)) == (kind == "G"), "%s tank collision" % kind)
 	b.terrain.clear()
-	check(not b.can_occupy(Vector2(5, 40)) and not b.can_occupy(Vector2(412, 40)), "arena boundaries contain tanks")
-	check(not b.can_occupy(Vector2(208, 16)) and not b.can_occupy(Vector2(208, 400)), "both bases block tanks")
+	check(not b.can_occupy(Vector2(5, 40)) and not b.can_occupy(Vector2(Model.WIDTH - 4, 40)), "arena boundaries contain tanks")
+	check(not b.can_occupy(Vector2(Model.WIDTH / 2, 16)) and not b.can_occupy(Vector2(Model.WIDTH / 2, Model.HEIGHT - 16)), "both bases block tanks")
 	var t: Dictionary = b.spawn_tank(1, Vector2(80, 80), 0)
 	check(not b.can_occupy(t.pos) and b.can_occupy(t.pos, 1), "tank occupancy respects own ID")
 	b.tanks.clear()
@@ -248,8 +299,8 @@ func test_winner_and_restart() -> void:
 	var b = fresh(true)
 	b.bases[0].hp = 1
 	b.bases[1].hp = 1
-	b.bullets.append(bullet(Vector2(208, 33), 0, 1, 2))
-	b.bullets.append(bullet(Vector2(208, 383), 2, 0, 1))
+	b.bullets.append(bullet(Vector2(Model.WIDTH / 2, 33), 0, 1, 2))
+	b.bullets.append(bullet(Vector2(Model.WIDTH / 2, Model.HEIGHT - 33), 2, 0, 1))
 	advance(b, 1)
 	check(b.state == "ended" and b.winner == 2, "same-tick mutual base destruction is deterministic draw")
 	var end_tick: int = b.tick
@@ -266,7 +317,7 @@ func test_snapshot_and_disconnect() -> void:
 	advance(b, 20, {1: {"dir": 1, "fire": true}})
 	b.damage_base(1)
 	var snap: Dictionary = b.snapshot()
-	check(snap.terrain is PackedByteArray and snap.terrain.size() == 676, "snapshot packs full terrain into 676 bytes")
+	check(snap.terrain is PackedByteArray and snap.terrain.size() == Model.TERRAIN_COLUMNS * Model.TERRAIN_ROWS, "snapshot packs complete 46 by 26 rectangular terrain")
 	var client = Model.new()
 	client.apply_snapshot(snap)
 	check(client.snapshot() == snap, "snapshot round trip preserves full authoritative state")

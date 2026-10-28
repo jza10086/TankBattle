@@ -4,7 +4,11 @@ extends Node2D
 ## passes through BattleNetwork; only the host owns the simulation.
 const NetworkModel = preload("res://scripts/network.gd")
 const FONT = preload("res://assets/fonts/Interface.ttf")
-const ORIGIN := Vector2(24, 48)
+# Combat stays in one shared 736 × 416 server coordinate system. The camera is
+# presentation-only: uniform fit, with continuous countryside beyond the arena.
+const DESIGN_SIZE := Vector2(640, 480)
+const FIELD_COLOR := Color("131c18")
+const BLINK_HZ := 3.0
 const INK := Color("131719")
 const PAPER := Color("d6d5bc")
 const MUTED := Color("8d9690")
@@ -46,6 +50,13 @@ var rematch_button: Button
 var room_button: Button
 var confirm_dialog: ConfirmationDialog
 var pending_action := ""
+var viewport_size := DESIGN_SIZE
+var ui_origin := Vector2.ZERO
+var ui_scale := 1.0
+var field_origin := Vector2.ZERO
+var field_scale := 1.0
+var hud_layer: Control
+var menu_backdrop: ColorRect
 
 func _ready() -> void:
 	get_window().min_size = Vector2i(640, 480)
@@ -72,6 +83,8 @@ func _ready() -> void:
 	for kind in ["fire", "brick", "armor", "kill", "death", "win", "lose"]:
 		sounds[kind] = synthesize(kind)
 	_build_ui()
+	get_viewport().size_changed.connect(_layout_viewport)
+	_layout_viewport()
 	_refresh()
 
 func _style(fill: Color, border: Color = Color("48534d")) -> StyleBoxFlat:
@@ -192,13 +205,24 @@ func _build_ui() -> void:
 	connecting_panel = _control(ui, Rect2(0, 0, 640, 480))
 	_label(connecting_panel, "正在连接房主…", Rect2(176, 216, 310, 32), 18, GOLD)
 	_button(connecting_panel, "取消连接", Rect2(232, 287, 176, 36), _leave)
-	menu_button = _button(ui, "菜单 / Esc", Rect2(464, 405, 152, 28), _toggle_menu)
+	hud_layer = Control.new()
+	hud_layer.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	hud_layer.theme = theme
+	add_child(hud_layer)
+	menu_button = _button(hud_layer, "菜单 / Esc", Rect2(0, 0, 110, 32), _toggle_menu)
+	menu_button.focus_mode = Control.FOCUS_NONE
+	for state in ["normal", "hover", "pressed", "focus"]:
+		var glass := _style(Color(0.03, 0.06, 0.04, 0.58 if state == "normal" else 0.85))
+		glass.set_border_width_all(0)
+		menu_button.add_theme_stylebox_override(state, glass)
+	# Full-window dimming is separate from the centered 640 × 480 menu content.
+	menu_backdrop = ColorRect.new()
+	menu_backdrop.color = Color(0.02, 0.04, 0.03, 0.75)
+	menu_backdrop.mouse_filter = Control.MOUSE_FILTER_STOP
+	add_child(menu_backdrop)
+	move_child(ui, get_child_count() - 1)
 
 	menu_panel = _control(ui, Rect2(0, 0, 640, 480))
-	var dim := ColorRect.new()
-	dim.color = Color(0.02, 0.04, 0.03, 0.75)
-	dim.size = Vector2(640, 480)
-	menu_panel.add_child(dim)
 	_label(menu_panel, "本地菜单", Rect2(215, 130, 260, 35), 24, GOLD)
 	_label(menu_panel, "联机对战仍在继续；你的战车暂时停止操作。", Rect2(137, 183, 390, 28), 12, PAPER)
 	_button(menu_panel, "返回战场", Rect2(204, 230, 232, 36), _toggle_menu, true)
@@ -207,15 +231,15 @@ func _build_ui() -> void:
 
 	result_panel = _control(ui, Rect2(0, 0, 640, 480))
 	var shade := ColorRect.new()
-	shade.position = Vector2(57, 148)
+	shade.position = Vector2(145, 148)
 	shade.size = Vector2(350, 214)
 	shade.color = Color(0.04, 0.07, 0.06, 0.96)
 	result_panel.add_child(shade)
-	result_label = _label(result_panel, "", Rect2(67, 171, 330, 46), 28, GOLD)
+	result_label = _label(result_panel, "", Rect2(155, 171, 330, 46), 28, GOLD)
 	result_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_label(result_panel, "本局对战结束", Rect2(91, 220, 282, 24), 12, PAPER).horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	rematch_button = _button(result_panel, "返回房间 / 再战", Rect2(100, 269, 264, 34), _rematch, true)
-	_button(result_panel, "离开房间", Rect2(100, 312, 264, 29), func(): _confirm("leave"))
+	_label(result_panel, "本局对战结束", Rect2(179, 220, 282, 24), 12, PAPER).horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	rematch_button = _button(result_panel, "返回房间 / 再战", Rect2(188, 269, 264, 34), _rematch, true)
+	_button(result_panel, "离开房间", Rect2(188, 312, 264, 29), func(): _confirm("leave"))
 
 	confirm_dialog = ConfirmationDialog.new()
 	confirm_dialog.title = "确认离开？"
@@ -223,6 +247,29 @@ func _build_ui() -> void:
 	confirm_dialog.cancel_button_text = "取消"
 	confirm_dialog.confirmed.connect(_confirmed)
 	ui.add_child(confirm_dialog)
+
+func _layout_viewport() -> void:
+	viewport_size = get_viewport_rect().size
+	ui_scale = minf(viewport_size.x / DESIGN_SIZE.x, viewport_size.y / DESIGN_SIZE.y)
+	ui_origin = ((viewport_size - DESIGN_SIZE * ui_scale) / 2.0).round()
+	ui.position = ui_origin
+	ui.scale = Vector2.ONE * ui_scale
+	field_scale = minf(viewport_size.x / game.WIDTH, viewport_size.y / game.HEIGHT)
+	field_origin = ((viewport_size - Vector2(game.WIDTH, game.HEIGHT) * field_scale) / 2.0).round()
+	hud_layer.size = viewport_size
+	# Overlay sizing follows the UI, not the world: compact on every aspect ratio.
+	menu_button.scale = Vector2.ONE * ui_scale
+	menu_button.position = viewport_size - Vector2(124, 46) * ui_scale
+	menu_backdrop.size = viewport_size
+	queue_redraw()
+
+func _world_transform() -> void:
+	draw_set_transform(field_origin, 0, Vector2.ONE * field_scale)
+
+# Authoritative protection gates the effect. Hit flashes and UI time never grant
+# immunity. Use snapshot elapsed time so every peer sees the same ~3 Hz phase.
+func invulnerability_alpha(shield: float, elapsed: float) -> float:
+	return 0.28 if shield > 0.0 and fmod(elapsed * BLINK_HZ, 1.0) >= 0.5 else 1.0
 
 func _on_snapshot() -> void:
 	# The reliable room-state update can arrive before its final combat snapshot.
@@ -316,6 +363,7 @@ func _refresh() -> void:
 	connecting_panel.visible = net.mode == "connecting"
 	menu_button.visible = net.mode == "playing" and not local_menu
 	menu_panel.visible = net.mode == "playing" and local_menu
+	menu_backdrop.visible = menu_panel.visible
 	result_panel.visible = net.mode == "ended"
 	room_button.visible = net.is_host()
 	status_label.text = message if not message.is_empty() else net.reason
@@ -405,19 +453,22 @@ func centered(value: String, y: float, size: int = 16, color: Color = WHITE, x: 
 	text_at(value, Vector2(x - width / 2, y), size, color)
 
 func _draw() -> void:
-	draw_rect(Rect2(0, 0, 640, 480), INK)
+	draw_rect(Rect2(Vector2.ZERO, viewport_size), INK)
+	if net.mode in ["playing", "ended"]:
+		_draw_battle()
+		return
+	draw_set_transform(ui_origin, 0, Vector2.ONE * ui_scale)
 	text_at("铁鹰防线", Vector2(24, 30), 22, GOLD)
 	text_at("T A N K   B A T T L E", Vector2(166, 28), 11, MUTED)
 	text_at("团队联机", Vector2(518, 28), 11, PAPER)
-	if net.mode in ["playing", "ended"]:
-		_draw_battle()
-	elif net.mode == "lobby":
+	if net.mode == "lobby":
 		_draw_room()
 	elif net.mode == "offline":
 		centered("红蓝团队对抗", 94, 30, GOLD)
 		centered("2–8 人实时联机 · 击毁敌方基地获胜", 125, 12, PAPER)
 		draw_rect(Rect2(134, 146, 372, 216), Color("1c2520"))
 		draw_rect(Rect2(134, 146, 372, 216), Color("475343"), false, 1)
+	draw_set_transform(Vector2.ZERO)
 
 func _draw_room() -> void:
 	text_at("对战房间 / %d 人（最多 8 人）" % net.roster.size(), Vector2(30, 71), 18, GOLD)
@@ -446,27 +497,23 @@ func _draw_room() -> void:
 				draw_rect(Rect2(x, y, 280, 37), color, false, 1)
 
 func _draw_battle() -> void:
-	draw_rect(Rect2(ORIGIN - Vector2(3, 3), Vector2(422, 422)), Color("62665d"))
-	draw_rect(Rect2(ORIGIN, Vector2(416, 416)), Color("090d0e"))
-	draw_set_transform(ORIGIN)
+	# No panel, decorative arena frame or letterbox: the same ground continues to
+	# every physical viewport edge. Terrain outside server bounds is scenery only.
+	draw_rect(Rect2(Vector2.ZERO, viewport_size), FIELD_COLOR)
+	_world_transform()
+	_draw_ground()
 	for cell in game.terrain:
 		var kind: String = game.terrain[cell]
 		if kind != "G":
 			draw_terrain(cell, kind)
-	for y in range(13):
-		for x in range(13):
-			var point := Vector2(x * 32 + 8, y * 32 + 24)
-			if not game.terrain.has(Vector2i(point / 16)):
-				draw_rect(Rect2(point, Vector2.ONE), Color("1c2424"))
 	for base in game.bases:
 		draw_base(base)
 	for tank in game.tanks:
-		draw_tank(tank.pos, tank.dir, "red" if tank.team == 0 else "blue", tank.anim, 1, tank.hit > 0)
-		if tank.shield > 0 and int(tank.shield * 12) % 2 == 0:
-			draw_rect(Rect2(tank.pos - Vector2(17, 17), Vector2(34, 34)), Color("f3ecc3"), false, 1)
-			draw_rect(Rect2(tank.pos - Vector2(19, 19), Vector2(38, 38)), Color("729fa7"), false, 1)
+		var opacity := invulnerability_alpha(tank.shield, game.elapsed)
+		draw_tank(tank.pos, tank.dir, "red" if tank.team == 0 else "blue", tank.anim, 1, tank.hit > 0, 1.0, opacity)
 		if tank.id == net.local_id:
-			draw_line(tank.pos + Vector2(-4, 17), tank.pos + Vector2(4, 17), GOLD, 2)
+			# A tiny identifying dot, never a focus frame or a shield outline.
+			draw_rect(Rect2(tank.pos + Vector2(-1, 17), Vector2(3, 2)), GOLD)
 	for bullet in game.bullets:
 		var bullet_size := Vector2(6, 3) if bullet.dir % 2 == 1 else Vector2(3, 6)
 		draw_rect(Rect2(bullet.pos - bullet_size / 2, bullet_size), Color("ffcaad") if bullet.team == 0 else Color("bcefff"))
@@ -477,6 +524,29 @@ func _draw_battle() -> void:
 		draw_explosion(effect)
 	draw_set_transform(Vector2.ZERO)
 	draw_hud()
+
+func _draw_ground() -> void:
+	var start := Vector2i((-field_origin / field_scale / 16.0).floor()) - Vector2i.ONE
+	var end := Vector2i(((viewport_size - field_origin) / field_scale / 16.0).ceil()) + Vector2i.ONE
+	for y in range(start.y, end.y):
+		for x in range(start.x, end.x):
+			var cell := Vector2i(x, y)
+			var seed_value := absi(x * 17 + y * 31 + x * y * 3)
+			var p := Vector2(cell * 16)
+			# Low-contrast flecks give the entire viewport one continuous pixel floor.
+			draw_rect(Rect2(p + Vector2(seed_value % 13, (seed_value / 7) % 13), Vector2(2, 1)), Color("243027"))
+			if x >= 0 and x < game.WIDTH / 16 and y >= 0 and y < game.HEIGHT / 16:
+				continue
+			# Natural, irregular scrub marks impassable countryside; no hard outline.
+			# It is decoration only and never appears in the replicated terrain map.
+			# Dense treetops connect across tiles, so no apparently walkable void
+			# is hidden behind an invisible wall. Irregular crowns avoid a UI frame.
+			var inset := Vector2(seed_value % 4, (seed_value / 3) % 4)
+			draw_rect(Rect2(p, Vector2(16, 16)), Color("192c20"))
+			draw_rect(Rect2(p + Vector2(1, 3), Vector2(15, 11)), Color("27432b"))
+			draw_rect(Rect2(p + inset, Vector2(12, 12)), Color("2e4b30"))
+			draw_rect(Rect2(p + inset + Vector2(2, 1), Vector2(7, 3)), Color("3a5836"))
+			draw_rect(Rect2(p + Vector2(8, 10), Vector2(8, 6)), Color("203b29"))
 
 func draw_terrain(cell: Vector2i, kind: String) -> void:
 	var p := Vector2(cell * 16)
@@ -511,7 +581,7 @@ func draw_terrain(cell: Vector2i, kind: String) -> void:
 				var color: Color = [Color("294b2a"), Color("426b32"), Color("638540"), Color("345b2d"), Color("234526")][seed_value]
 				draw_rect(Rect2(p + Vector2(x * 4, y * 4), Vector2(4, 3 if seed_value == 0 else 4)), color)
 
-func draw_tank(pos: Vector2, direction: int, kind: String, anim: float = 0, hp: int = 1, hit: bool = false, scale_value: float = 1.0) -> void:
+func draw_tank(pos: Vector2, direction: int, kind: String, anim: float = 0, hp: int = 1, hit: bool = false, scale_value: float = 1.0, opacity: float = 1.0) -> void:
 	var body := GOLD
 	var light := Color("fff0a2")
 	var dark := Color("a37d32")
@@ -529,27 +599,27 @@ func draw_tank(pos: Vector2, direction: int, kind: String, anim: float = 0, hp: 
 		body = Color("9dba77"); light = Color("e0dfa1"); dark = Color("576e47")
 	if hit:
 		body = WHITE; light = WHITE; dark = Color("b3b69c")
-	draw_set_transform(ORIGIN + pos, direction * PI / 2.0, Vector2.ONE * scale_value)
-	draw_rect(Rect2(-13, -12, 7, 25), dark)
-	draw_rect(Rect2(6, -12, 7, 25), dark)
+	draw_set_transform(field_origin + pos * field_scale, direction * PI / 2.0, Vector2.ONE * scale_value * field_scale)
+	draw_rect(Rect2(-13, -12, 7, 25), Color(dark, opacity))
+	draw_rect(Rect2(6, -12, 7, 25), Color(dark, opacity))
 	for y in range(-11, 13, 5):
 		var track_y := y + (int(anim / 3) % 2)
-		draw_rect(Rect2(-13, track_y, 7, 2), Color("242c2b"))
-		draw_rect(Rect2(6, track_y, 7, 2), Color("242c2b"))
-		draw_rect(Rect2(-12, track_y + 2, 2, 2), light)
-		draw_rect(Rect2(10, track_y + 2, 2, 2), light)
-	draw_rect(Rect2(-7, -10, 14, 21), body)
-	draw_rect(Rect2(-5, -10, 10, 2), light)
-	draw_rect(Rect2(-5, 8, 10, 3), dark)
-	draw_rect(Rect2(-5, -6, 10, 11), dark)
-	draw_rect(Rect2(-4, -7, 8, 10), body)
-	draw_rect(Rect2(-3, -7, 6, 2), light)
-	draw_rect(Rect2(-2, -16, 4, 13), dark)
-	draw_rect(Rect2(-1, -16, 2, 13), light)
+		draw_rect(Rect2(-13, track_y, 7, 2), Color(Color("242c2b"), opacity))
+		draw_rect(Rect2(6, track_y, 7, 2), Color(Color("242c2b"), opacity))
+		draw_rect(Rect2(-12, track_y + 2, 2, 2), Color(light, opacity))
+		draw_rect(Rect2(10, track_y + 2, 2, 2), Color(light, opacity))
+	draw_rect(Rect2(-7, -10, 14, 21), Color(body, opacity))
+	draw_rect(Rect2(-5, -10, 10, 2), Color(light, opacity))
+	draw_rect(Rect2(-5, 8, 10, 3), Color(dark, opacity))
+	draw_rect(Rect2(-5, -6, 10, 11), Color(dark, opacity))
+	draw_rect(Rect2(-4, -7, 8, 10), Color(body, opacity))
+	draw_rect(Rect2(-3, -7, 6, 2), Color(light, opacity))
+	draw_rect(Rect2(-2, -16, 4, 13), Color(dark, opacity))
+	draw_rect(Rect2(-1, -16, 2, 13), Color(light, opacity))
 	if kind == "armor":
 		for i in range(hp):
-			draw_rect(Rect2(-5 + i * 4, 6, 2, 3), light)
-	draw_set_transform(ORIGIN)
+			draw_rect(Rect2(-5 + i * 4, 6, 2, 3), Color(light, opacity))
+	_world_transform()
 
 func draw_base(base: Dictionary) -> void:
 	var p: Vector2 = base.pos
@@ -559,13 +629,13 @@ func draw_base(base: Dictionary) -> void:
 		draw_line(p + Vector2(6, 6), p + Vector2(26, 26), color.darkened(0.3), 4)
 		draw_line(p + Vector2(26, 6), p + Vector2(6, 26), color.darkened(0.3), 4)
 		return
+	var symbol := Color(color, invulnerability_alpha(base.shield, game.elapsed))
 	for rect in [Rect2(14, 7, 5, 16), Rect2(5, 11, 22, 4), Rect2(3, 8, 5, 12), Rect2(24, 8, 5, 12), Rect2(8, 14, 4, 9), Rect2(20, 14, 4, 9), Rect2(12, 21, 9, 5), Rect2(18, 8, 4, 3)]:
-		draw_rect(Rect2(p + rect.position, rect.size), color)
+		draw_rect(Rect2(p + rect.position, rect.size), symbol)
 	draw_rect(Rect2(p + Vector2(15, 7), Vector2(2, 2)), INK)
-	for i in range(5):
+	# HP remains visible in both phases; only the base symbol blinks.
+	for i in range(game.BASE_HP):
 		draw_rect(Rect2(p + Vector2(2 + i * 6, 1), Vector2(4, 2)), color if i < base.hp else Color("3c423a"))
-	if base.shield > 0 and int(base.shield * 12) % 2 == 0:
-		draw_rect(Rect2(p - Vector2.ONE, Vector2(34, 34)), WHITE, false, 2)
 
 func draw_explosion(effect: Dictionary) -> void:
 	var progress: float = 1.0 - effect.life / effect.max_life
@@ -581,37 +651,25 @@ func draw_explosion(effect: Dictionary) -> void:
 		draw_rect(Rect2(pos - Vector2(3, 3), Vector2(6, 6)), WHITE)
 
 func draw_hud() -> void:
+	# Two small translucent readouts float on the field, not in a side panel.
+	var screen := viewport_size / ui_scale
+	draw_set_transform(Vector2.ZERO, 0, Vector2.ONE * ui_scale)
 	for team in range(2):
 		if game.bases.size() <= team:
 			continue
 		var base: Dictionary = game.bases[team]
-		var y := 62 + team * 66
 		var color := RED if team == 0 else BLUE
-		text_at("红方基地" if team == 0 else "蓝方基地", Vector2(464, y + 9), 12, color)
-		text_at("%d / %d" % [base.hp, game.BASE_HP], Vector2(583, y + 9), 11, PAPER)
+		var x := 14.0 if team == 0 else screen.x - 152.0
+		draw_rect(Rect2(x, 12, 138, 42), Color(0.03, 0.06, 0.04, 0.58))
+		text_at("红方基地" if team == 0 else "蓝方基地", Vector2(x + 9, 30), 12, color)
+		text_at("%d / %d" % [base.hp, game.BASE_HP], Vector2(x + 101, 30), 11, PAPER)
 		for i in range(game.BASE_HP):
-			var bar_step: float = 155.0 / game.BASE_HP
-			draw_rect(Rect2(464 + i * bar_step, y + 20, bar_step - 4, 9), color if i < base.hp else Color("303c34"))
-		text_at("无敌 %.1f 秒" % (ceilf(base.shield * 10) / 10) if base.shield > 0 else "", Vector2(464, y + 45), 10, GOLD)
-	draw_rect(Rect2(464, 189, 152, 1), Color("3e4743"))
-	text_at("玩家", Vector2(464, 208), 11, MUTED)
-	text_at("击破/阵亡", Vector2(572, 208), 10, MUTED)
-	var row := 0
-	for id in game.players:
-		var player: Dictionary = game.players[id]
-		var y := 228 + row * 18
-		var color := RED if player.team == 0 else BLUE
-		text_at((">" if id == net.local_id else " ") + _fit_name(str(player.name), 102, 11), Vector2(464, y), 11, color)
-		text_at("%d/%d" % [player.kills, player.deaths], Vector2(586, y), 10, PAPER)
-		row += 1
+			draw_rect(Rect2(x + 9 + i * 24, 39, 21, 5), color if i < base.hp else Color("354039"))
 	var me: Dictionary = game.players.get(net.local_id, {})
 	if not me.is_empty() and float(me.get("respawn", -1.0)) >= 0:
-		text_at("等待出生位置" if me.respawn <= 0.02 else "复活 %.1f 秒" % maxf(0, me.respawn), Vector2(464, 386), 12, GOLD)
-	else:
-		var tank: Dictionary = game.tank_for(net.local_id)
-		text_at("无敌 %.1f 秒" % (ceilf(tank.shield * 10) / 10) if not tank.is_empty() and tank.shield > 0 else "无限复活", Vector2(464, 386), 10, GOLD if not tank.is_empty() and tank.shield > 0 else PAPER)
-	text_at("WASD / 方向键 移动", Vector2(464, 450), 10, MUTED)
-	text_at("空格 开火　M 音效", Vector2(464, 466), 10, MUTED)
+		var value := "等待出生位置" if me.respawn <= 0.02 else "复活 %.1f 秒" % maxf(0, me.respawn)
+		centered(value, screen.y - 23, 15, GOLD, screen.x / 2)
+	draw_set_transform(Vector2.ZERO)
 
 func synthesize(kind: String) -> AudioStreamWAV:
 	var seconds := 0.08
