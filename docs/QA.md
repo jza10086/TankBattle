@@ -1,76 +1,83 @@
-# Verification
+# Multiplayer verification
 
-## Automated simulation regression
+Verified on **2026-10-28**, using the dot cloud computer and native **Godot 4.7.2 stable**. Initial parse/model checks also ran on Godot 4.6.3. This report distinguishes deterministic simulation, genuine network processes, and native visual/input verification.
 
-Verified locally on 2026-10-27 with Godot 4.7.2 stable:
-**93 checks, 0 failures**, with no engine/script error output.
-
-The suite caught and verified fixes for a supply spawning inside brick terrain
-and a near-waypoint floating-point oscillation that could strand a center-lane
-armored enemy.
-
-Run from the project directory with Godot 4.x:
+## 1. Deterministic combat: 143 checks, 0 failures
 
 ```sh
 GODOT_BIN=/path/to/godot tests/run_tests.sh
 ```
 
-The runner creates isolated temporary XDG data/cache/config directories, executes
-`tests/test_battle.gd` headlessly, and fails on engine/script errors as well as
-assertion failures. Checking only Godot's exit status is insufficient: script
-exceptions can otherwise finish with exit code zero.
+`tests/test_battle.gd` exercises the actual production model:
 
-The regression suite exercises the actual `scripts/battle.gd` simulation, not a
-separate implementation of its rules. Isolated collisions use controlled setups;
-route/breach and stress cases advance the normal simulation tick.
+- No automatic movement, enemies, AI or firing; only roster humans are spawned.
+- Eight humans spawn without overlap; occupied spawn alternatives and all-blocked retry.
+- Unlimited respawns after **ten successive deaths**, exact 120-tick respawn delay and player shield.
+- Base 5 HP, independent exact 60-tick damage protection, same-tick repeated-hit rejection.
+- Friendly-fire protection for both teams' tanks and bases; enemy shield absorption.
+- Mirrored arena; all 32 team spawn candidates can reach the opposing base attack lane after destructible brick removal.
+- Half-course brick damage, steel, water, grass, tank occupancy/bounds, microstep projectile collision, opposing bullet cancellation.
+- Host movement speed, malformed input rejection, exact fire cadence and per-owner two-projectile limit.
+- Deterministic same-tick double-base destruction draw; normal win and frozen terminal combat.
+- Full rematch cleanup of bases, terrain, scores, bullets, effects and respawn timers.
+- Complete packed-terrain snapshot roundtrip; client copies cannot mutate host objects.
+- Disconnect cleanup, 30/60 Hz caller equivalence and deterministic eight-player scripted-input stress.
 
-### Covered behavior
+The runner isolates XDG paths and fails on missing completion markers, assertion failures and engine/script errors, not just process exit code.
 
-- Title initialization; pause/resume; simulation, shield, reload, respawn,
-  spawn, effect, bullet, and supply timer freezing.
-- Full restart cleanup: counters, base, terrain, actors, effects, bullets,
-  supplies, and pending events.
-- Tank boundaries and tank/tank, base, brick, steel, water, and grass collision.
-- Brick half-course destruction and passage opening; indestructible steel;
-  bullets passing over water and through grass.
-- Opposing bullet cancellation, same-team bullet coexistence, player friendly-fire
-  protection, protected headquarters, hostile base destruction, and microstep
-  protection against fast bullet tunneling.
-- Enemy armor damage/score, player three-life exhaustion, delayed respawn,
-  spawn invulnerability, alternate respawn placement, and occupied-lane retries.
-- Reachable shield supplies and one-time pickup score/protection.
-- Occupied enemy spawn postponement, four-enemy active cap, exactly twenty
-  finite-wave enemies, and victory only after the final live enemy is gone.
-- A* routes from all three spawn lanes, rejecting water/steel and pricing bricks.
-- 30/60 Hz movement equivalence; reload and per-tank active bullet limits.
-- Unopposed headquarters breach for all four enemy roles from all three lanes.
-- Regression for near-waypoint floating-point corner oscillation.
-- Five simulated minutes of deterministic rapid random turns, firing, loss and
-  repeated restarts; no arena/wall/tank overlap or invalid life/wave counts.
-
-## Scope limits
-
-These are local headless simulation tests, not CI status and not native rendering,
-keyboard event, window resizing, audio-listening, accessibility, or gameplay
-balance certification. Native game review and repository publication checks are
-tracked separately by the implementation task. No multiplayer, campaign, or
-platform export coverage is claimed.
-
-## Native desktop verification (main task)
-
-- Existing supported dot cloud desktop, inherited `DISPLAY=:0`; no new X server or display-security changes.
-- Godot 4.7.2, OpenGL compatibility / Mesa llvmpipe.
-- `tests/native_capture.gd` loads the real main scene and injects actual Godot input events: Enter, held Up + Space, P, R.
-- Verified live movement/fire, pause freezing elapsed simulation time for 60 physics frames, reset to 3 lives/0 kills/0 spawned, and resize from 1180×812 to 900×600 with preserved arena aspect ratio.
-- Inspected actual viewport PNGs for title, gameplay, paused and resized states; no clipped Chinese UI or overlapping controls found.
-- Victory and defeat **layout fixtures** were inspected separately; these screenshots are not evidence of a human-played full clear. The 20-enemy clear conditions are covered by the model regression suite.
-- Captures were rendered with the Dummy audio driver; synthesis construction was exercised but speaker playback/listening was not verified.
-- Desktop driver reports unsupported V-Sync mode; rendering continues normally. No script errors in final native capture log.
-
-To reproduce native capture on an already available desktop:
+## 2. Genuine ENet process integration
 
 ```sh
-TANK_CAPTURE_DIR=/absolute/writable/output godot --path . --script res://tests/native_capture.gd
+GODOT_BIN=/path/to/godot python3 tests/run_network_tests.py --players 2 3 8
+GODOT_BIN=/path/to/godot python3 tests/run_network_tests.py --players 2 --address ::1 --base-port 17880
 ```
 
-The output directory contains screenshots only and is not included in the source repository. No exported binaries or ZIP deliverable is required.
+Final results (all zero failures / zero full-state mismatches):
+
+| Transport | Human process count | Peer assertions | Identical host/client snapshots |
+| --- | --- | --- | --- |
+| IPv4 loopback, three cases | 2, 3, 8 | 160 total | 1,912 total |
+| IPv6 loopback | 2 | 32 | 193 |
+
+Maximum observed compressed state was **751 bytes**. The final aggregate runner completed `NETWORK_TESTS: 3/3 cases passed`; IPv6 completed `1/1 cases passed`. No final script/runtime errors or MTU warnings.
+
+Each case starts a **real Godot host process and distinct Godot client processes using UDP/ENet**. They are not local hotseat, fake transport, or eight objects in one simulation. All commands generated by the harness are prerecorded human-input tests; no test driver is loaded by the game scene.
+
+Coverage:
+
+- Room create/join, 2/3/8 humans, automatically balanced red/blue teams, client ready, host-only start and rematch.
+- Single-player start refusal, four-player team cap, explicit rejection of a ninth human and a join during a match.
+- Client input moves only its own tank; ID/team-shaped fake input, invalid directions/types, spam and stale previous-match epochs are rejected.
+- Real client firing destroys host-simulated brick and damages the enemy base.
+- Every received snapshot is hashed over the **entire authoritative state** and compared against the host's same epoch/tick: positions, bullets, terrain, base HP/shield, player respawn/shield, scores and result.
+- Both matches and fresh rematch state, deliberate client disconnection, removal from host state, and host loss returning other peers to the entry screen with a clear reason.
+- Snapshots use bounded DEFLATE payloads; observed eight-player peak was below the ENet MTU, with no oversized-packet warnings in the final run.
+
+**Fixture boundary:** To test damage/respawn reliably without waiting for humans to navigate the arena, the host test harness deliberately positions the firing human in a clear lane/near cover, invokes one death, and finishes the first match through a host-only base fixture. Movement and firing still traverse real client RPCs. The exact damage/timer/win rules are separately verified by the deterministic model suite. This is network replication evidence, not an eight-human balance playtest.
+
+## 3. Native desktop: real two-process pass
+
+`tests/native_capture.gd` ran on the existing supported dot desktop (`DISPLAY=:0`), with a separate real ENet client launched by `tests/native_peer.gd`. No new X server, port forwarding, firewall or display-security setting was created or changed.
+
+Passed:
+
+- Actual viewport capture of entry, ready two-player lobby, live battle, local menu, resized window and rematch.
+- Native Godot keyboard events moved/fired the host's tank; both human tanks appeared in the game.
+- Escape opened a **local** menu: host ticks kept advancing while local held movement/fire stopped.
+- Leave confirmation and Cancel preserved the match/connection.
+- Confirmed host return-to-room kept peers connected; client readied again and the host started a clean rematch.
+- Window resized from 1040×780 to 900×600 without clipping battlefield or controls.
+- The separate client exited after the host closed; final marker `NATIVE_MULTIPLAYER_QA: PASS`.
+- Screenshots inspected: Chinese glyphs, red/blue team identity, HP bars, shield indication, controls, spacing and aspect ratio. Shield seconds round up to avoid displaying `0.0` while still protected.
+
+The initial uncompressed integration run exposed packet-size warnings; transport was compressed and retested. Early harness assertions were tightened to account for projectile lifetime and unreliable stale-input probe delivery; those were test-observation failures, not reported as passing runs.
+
+## Limits
+
+- Local IPv4/IPv6 loopback tests do **not** prove public-internet reachability, NAT traversal, router/firewall setup, high-latency behavior or cross-machine connectivity.
+- No real eight-person usability/balance session, packet-loss/latency soak, host migration, authentication, encryption or production anti-DDoS claim.
+- Client presentation uses 20 Hz authoritative snapshots without prediction/interpolation/rollback.
+- Native rendering used OpenGL compatibility / Mesa llvmpipe and Dummy audio. Sound synthesis constructs, but speaker playback/listening was not tested.
+- The desktop driver reports an unsupported V-Sync-mode warning; rendering and capture continue correctly. No final native script errors.
+- Local tests are not GitHub CI. Repository commit/check status is verified separately at publication; absence of checks is not a CI pass.
+- No Windows/macOS export package, binary build or source ZIP was created.

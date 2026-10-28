@@ -1,80 +1,62 @@
 class_name Battle
 extends RefCounted
 
-## Deterministic, renderer-independent 60 Hz combat simulation. All positions are local to the arena.
+## Pure authoritative combat model. No AI, scene tree, input device or networking.
+## Timers use exact 60 Hz ticks; the renderer receives seconds for UI only.
 const TILE := 32
 const SIZE := 416
 const HALF := 12.0
-const MAX_ENEMIES := 20
+const TICK_RATE := 60
+const STEP := 1.0 / TICK_RATE
+const PLAYER_SPEED := 106.0
+const BULLET_SPEED := 294.0
+const FIRE_INTERVAL := 0.28
+const FIRE_TICKS := ceili(FIRE_INTERVAL * TICK_RATE)
+const MAX_BULLETS := 2
+const RESPAWN_DELAY := 2.0
+const RESPAWN_TICKS := ceili(RESPAWN_DELAY * TICK_RATE)
+const RESPAWN_SHIELD := 2.0
+const SHIELD_TICKS := ceili(RESPAWN_SHIELD * TICK_RATE)
+const BASE_HP := 5
+const BASE_INVULNERABILITY := 1.0
+const BASE_SHIELD_TICKS := ceili(BASE_INVULNERABILITY * TICK_RATE)
 const DIRS := [Vector2.UP, Vector2.RIGHT, Vector2.DOWN, Vector2.LEFT]
-const ENEMY_TYPES := ["scout", "regular", "regular", "gunner", "armor", "regular", "scout", "gunner", "regular", "armor", "scout", "regular", "gunner", "armor", "scout", "regular", "gunner", "armor", "scout", "armor"]
-const STATS := {
-	"player": {"speed": 106.0, "hp": 1, "reload": 0.28, "bullet": 294.0, "points": 0},
-	"regular": {"speed": 47.0, "hp": 1, "reload": 1.65, "bullet": 178.0, "points": 100},
-	"scout": {"speed": 72.0, "hp": 1, "reload": 1.9, "bullet": 178.0, "points": 200},
-	"gunner": {"speed": 44.0, "hp": 1, "reload": 1.05, "bullet": 235.0, "points": 300},
-	"armor": {"speed": 36.0, "hp": 3, "reload": 1.65, "bullet": 184.0, "points": 400}
-}
+# Both horizontal and vertical mirrors: same cover, travel distance and spawn space.
 const MAP := [
-	".............",
-	".BB.B.B.B.BB.",
-	".BB.B.B.B.BB.",
-	".....S.S.....",
+	".....B.B.....",
+	".....BBB.....",
 	".BB.B...B.BB.",
+	".GG...S...GG.",
+	".GG.B...B.GG.",
 	"....WW.WW....",
-	".BB.......BB.",
-	"....B.S.B....",
+	".BB..S.S..BB.",
+	"....WW.WW....",
 	".GG.B...B.GG.",
 	".GG...S...GG.",
 	".BB.B...B.BB.",
 	".....BBB.....",
-	".....BHB....."
+	".....B.B....."
 ]
-var terrain: Dictionary = {} # Vector2i 16 px cells: B brick, S steel, W water, G grass
+var state := "lobby"
+var winner := -1 # 0 red, 1 blue, 2 simultaneous destruction / draw.
+var elapsed := 0.0
+var tick := 0
+var terrain: Dictionary = {}
 var tanks: Array[Dictionary] = []
 var bullets: Array[Dictionary] = []
 var effects: Array[Dictionary] = []
 var events: Array[String] = []
-var powerups: Array[Dictionary] = []
-var rng := RandomNumberGenerator.new()
-var state := "title"
-var lives := 3
-var spawned := 0
-var killed := 0
-var score := 0
-var base_alive := true
-var elapsed := 0.0
-var spawn_timer := 0.0
-var respawn_timer := -1.0
-var next_id := 1
-var pause_previous := "playing"
-var base_rect := Rect2(192, 384, 32, 32)
-var player_spawn := Vector2(144, 400)
-var flash_timer := 0.0
-var mute := false
+var players: Dictionary = {}
+var bases: Array[Dictionary] = []
+var next_bullet_id := 1
+var _accumulator := 0.0
 
-func _init(seed_value: int = 4276) -> void:
-	rng.seed = seed_value
-	reset(false)
+func _init() -> void:
+	_load_terrain()
+	_reset_bases()
 
-func reset(start: bool = true) -> void:
+func _load_terrain() -> void:
 	terrain.clear()
-	tanks.clear()
-	bullets.clear()
-	effects.clear()
-	events.clear()
-	powerups.clear()
-	lives = 3
-	spawned = 0
-	killed = 0
-	score = 0
-	base_alive = true
-	elapsed = 0.0
-	spawn_timer = 1.8
-	respawn_timer = -1.0
-	next_id = 1
-	flash_timer = 0.0
-	state = "playing" if start else "title"
 	for y in range(13):
 		assert(MAP[y].length() == 13)
 		for x in range(13):
@@ -83,67 +65,125 @@ func reset(start: bool = true) -> void:
 				for oy in range(2):
 					for ox in range(2):
 						terrain[Vector2i(x * 2 + ox, y * 2 + oy)] = kind
-	spawn_tank(player_spawn, "player", 0, 3.0)
 
-func player() -> Dictionary:
+func _reset_bases() -> void:
+	bases.clear()
+	for team in range(2):
+		bases.append({"team": team, "hp": BASE_HP, "shield": 0.0,
+			"shield_until": 0, "pos": Vector2(192, 0 if team == 0 else 384)})
+
+func reset(roster: Dictionary) -> void:
+	state = "playing"
+	winner = -1
+	elapsed = 0.0
+	tick = 0
+	_accumulator = 0.0
+	next_bullet_id = 1
+	tanks.clear()
+	bullets.clear()
+	effects.clear()
+	events.clear()
+	players.clear()
+	_load_terrain()
+	_reset_bases()
+	var ids := roster.keys()
+	ids.sort()
+	for id in ids:
+		var entry: Dictionary = roster[id]
+		if typeof(id) != TYPE_INT or id < 1 or not entry.get("team", -1) in [0, 1]:
+			continue
+		players[id] = {"id": id, "name": str(entry.get("name", "Player")), "team": int(entry.team),
+			"kills": 0, "deaths": 0, "respawn": 0.0, "respawn_at": 0}
+		try_respawn(id)
+
+func tank_for(id: int) -> Dictionary:
 	for tank in tanks:
-		if tank.team == 0:
+		if tank.id == id:
 			return tank
 	return {}
 
-func spawn_tank(pos: Vector2, kind: String, team: int, shield: float = 0.0) -> Dictionary:
-	var t := {"id": next_id, "pos": pos, "dir": 0 if team == 0 else 2, "kind": kind, "team": team, "hp": STATS[kind].hp, "cooldown": 0.25 if team == 0 else 0.9, "shield": shield, "ai_timer": 0.0, "waypoint": pos, "stuck": 0.0, "anim": 0.0, "hit": 0.0, "born": 0.45 if team == 1 else 0.0}
-	next_id += 1
-	tanks.append(t)
-	return t
+func base_rect(team: int) -> Rect2:
+	return Rect2(bases[team].pos, Vector2(32, 32))
 
-func toggle_pause() -> void:
-	if state == "playing":
-		state = "paused"
-	elif state == "paused":
-		state = "playing"
+func spawn_points(team: int) -> Array[Vector2]:
+	var result: Array[Vector2] = []
+	# Wide lanes avoid spawning teammates nose-to-tail. Secondary positions are safe fallbacks.
+	for y in [16, 48]:
+		for x in [48, 368, 112, 304, 16, 400, 80, 336]:
+			result.append(Vector2(x, y if team == 0 else SIZE - y))
+	return result
 
-func update(dt: float, direction: int = -1, firing: bool = false) -> void:
-	if state != "playing":
+func try_respawn(id: int) -> bool:
+	if not players.has(id) or not tank_for(id).is_empty():
+		return false
+	var p: Dictionary = players[id]
+	for pos in spawn_points(p.team):
+		if can_occupy(pos):
+			spawn_tank(id, pos, p.team)
+			p.respawn_at = -1
+			p.respawn = -1.0
+			return true
+	# Occupied lanes never overlap or kill an occupant. Retry on the next simulation tick.
+	p.respawn_at = tick + 1
+	p.respawn = STEP
+	return false
+
+func spawn_tank(id: int, pos: Vector2, team: int, shield: float = RESPAWN_SHIELD) -> Dictionary:
+	var tank := {"id": id, "pos": pos, "dir": 2 if team == 0 else 0, "team": team,
+		"anim": 0.0, "shield": shield, "shield_until": tick + ceili(shield * TICK_RATE),
+		"hit": 0.0, "cooldown": 0.0, "fire_at": tick}
+	tanks.append(tank)
+	return tank
+
+func remove_player(id: int) -> void:
+	players.erase(id)
+	tanks = tanks.filter(func(t): return t.id != id)
+	bullets = bullets.filter(func(b): return b.owner != id)
+
+func update(dt: float, inputs: Dictionary = {}) -> void:
+	if state != "playing" or not is_finite(dt) or dt <= 0:
 		return
-	dt = clampf(dt, 0.0, 0.05)
-	elapsed += dt
-	flash_timer = maxf(0, flash_timer - dt)
+	# One outer call cannot manufacture a huge amount of simulation time.
+	_accumulator += minf(dt, 0.25)
+	while _accumulator + 0.0000001 >= STEP and state == "playing":
+		_accumulator = maxf(0.0, _accumulator - STEP)
+		_step(inputs)
+
+func _step(inputs: Dictionary) -> void:
+	# Headless hosts may have no sound consumer; retain only a bounded recent event tail.
+	if events.size() > 128:
+		events = events.slice(events.size() - 128)
+	tick += 1
+	elapsed = tick * STEP
 	for e in effects:
-		e.life -= dt
+		e.life = maxf(0.0, e.life - STEP)
 	effects = effects.filter(func(e): return e.life > 0)
-	for item in powerups:
-		item.life -= dt
-	powerups = powerups.filter(func(item): return item.life > 0)
-	if respawn_timer >= 0:
-		respawn_timer -= dt
-		if respawn_timer <= 0:
-			try_respawn()
-	spawn_timer -= dt
-	if spawned < MAX_ENEMIES and enemy_count() < 4 and spawn_timer <= 0:
-		try_spawn_enemy()
-	for t in tanks.duplicate():
-		if not tanks.has(t):
+	for base in bases:
+		base.shield = maxf(0.0, (base.shield_until - tick) * STEP)
+	var ids := players.keys()
+	ids.sort()
+	for id in ids:
+		var p: Dictionary = players[id]
+		if p.respawn_at >= 0:
+			p.respawn = maxf(0.0, (p.respawn_at - tick) * STEP)
+			if tick >= p.respawn_at:
+				try_respawn(id)
+	for tank in tanks:
+		tank.shield = maxf(0.0, (tank.shield_until - tick) * STEP)
+		tank.cooldown = maxf(0.0, (tank.fire_at - tick) * STEP)
+		tank.hit = maxf(0.0, tank.hit - STEP)
+		var command = inputs.get(tank.id, {})
+		if not command is Dictionary:
 			continue
-		t.cooldown = maxf(0, t.cooldown - dt)
-		t.shield = maxf(0, t.shield - dt)
-		t.hit = maxf(0, t.hit - dt)
-		t.born = maxf(0, t.born - dt)
-		if t.born > 0:
-			continue
-		if t.team == 0:
-			if direction >= 0:
-				t.dir = direction
-				move_tank(t, DIRS[direction] * STATS.player.speed * dt, true)
-			if firing:
-				fire(t)
-			collect_powerup(t)
-		else:
-			update_enemy(t, dt)
-	update_bullets(dt)
-	if state == "playing" and spawned == MAX_ENEMIES and enemy_count() == 0:
-		state = "won"
-		events.append("win")
+		var direction = command.get("dir", -1)
+		if typeof(direction) == TYPE_INT and direction >= 0 and direction < 4:
+			tank.dir = direction
+			move_tank(tank, DIRS[direction] * PLAYER_SPEED * STEP, true)
+		var firing = command.get("fire", false)
+		if typeof(firing) == TYPE_BOOL and firing:
+			fire(tank)
+	update_bullets(STEP)
+	_check_winner()
 
 func tank_rect(pos: Vector2) -> Rect2:
 	return Rect2(pos - Vector2(HALF, HALF), Vector2(HALF * 2, HALF * 2))
@@ -152,8 +192,9 @@ func can_occupy(pos: Vector2, ignore_id: int = -1, include_tanks: bool = true) -
 	var rect := tank_rect(pos)
 	if rect.position.x < 0 or rect.position.y < 0 or rect.end.x > SIZE or rect.end.y > SIZE:
 		return false
-	if base_alive and rect.intersects(base_rect):
-		return false
+	for team in range(2):
+		if rect.intersects(base_rect(team)):
+			return false
 	var lo := Vector2i(floor(rect.position.x / 16), floor(rect.position.y / 16))
 	var hi := Vector2i(floor((rect.end.x - 0.01) / 16), floor((rect.end.y - 0.01) / 16))
 	for y in range(lo.y, hi.y + 1):
@@ -166,161 +207,48 @@ func can_occupy(pos: Vector2, ignore_id: int = -1, include_tanks: bool = true) -
 				return false
 	return true
 
-func move_tank(t: Dictionary, delta: Vector2, assisted: bool = false) -> bool:
+func move_tank(tank: Dictionary, delta: Vector2, assisted: bool = false) -> bool:
 	if delta.length_squared() == 0:
 		return false
-	var old: Vector2 = t.pos
+	var old: Vector2 = tank.pos
 	var candidate: Vector2 = old + delta
-	if can_occupy(candidate, t.id):
-		t.pos = candidate
-		t.anim += delta.length()
+	if can_occupy(candidate, tank.id):
+		tank.pos = candidate
+		tank.anim += delta.length()
 		return true
-	# Small lane alignment prevents 24 px tanks catching on 32 px corners.
+	# Preserve classic grid-corner alignment without ever crossing solid terrain.
 	if assisted:
 		var aligned := old
 		if delta.x != 0:
 			aligned.y = roundf((old.y - 16) / 32) * 32 + 16
 		else:
 			aligned.x = roundf((old.x - 16) / 32) * 32 + 16
-		if aligned.distance_to(old) <= 5.0 and can_occupy(aligned, t.id) and can_occupy(aligned + delta, t.id):
-			t.pos = aligned + delta
-			t.anim += delta.length()
+		if aligned.distance_to(old) <= 5.0 and can_occupy(aligned, tank.id) and can_occupy(aligned + delta, tank.id):
+			tank.pos = aligned + delta
+			tank.anim += delta.length()
 			return true
 	return false
 
-func enemy_count() -> int:
-	var total := 0
-	for t in tanks:
-		if t.team == 1:
-			total += 1
-	return total
-
-func try_spawn_enemy() -> bool:
-	var lanes := [Vector2(16, 16), Vector2(208, 16), Vector2(400, 16)]
-	var offset := spawned % 3
-	for i in range(3):
-		var pos: Vector2 = lanes[(offset + i) % 3]
-		if can_occupy(pos):
-			spawn_tank(pos, ENEMY_TYPES[spawned], 1, 1.0)
-			spawned += 1
-			spawn_timer = 3.6 if spawned < 4 else 2.5
-			return true
-	spawn_timer = 0.3
-	return false
-
-func try_respawn() -> void:
-	for pos in [player_spawn, Vector2(272, 400), Vector2(112, 400), Vector2(304, 400)]:
-		if can_occupy(pos):
-			spawn_tank(pos, "player", 0, 3.0)
-			respawn_timer = -1.0
-			return
-	respawn_timer = 0.25
-
-func tile_cost(cell: Vector2i) -> float:
-	if cell.x < 0 or cell.y < 0 or cell.x >= 13 or cell.y >= 13:
-		return INF
-	var brick := false
-	for oy in range(2):
-		for ox in range(2):
-			var kind: String = terrain.get(cell * 2 + Vector2i(ox, oy), "")
-			if kind in ["S", "W"]:
-				return INF
-			if kind == "B":
-				brick = true
-	return 3.4 if brick else 1.0
-
-func next_step(start: Vector2i, goal: Vector2i, variant: int = 0) -> Vector2i:
-	if start == goal:
-		return goal
-	var frontier: Array[Vector2i] = [start]
-	var costs := {start: 0.0}
-	var previous: Dictionary = {}
-	while not frontier.is_empty():
-		var best_index := 0
-		var best_score := INF
-		for i in range(frontier.size()):
-			var c := frontier[i]
-			var distance := absi(goal.x - c.x) + absi(goal.y - c.y)
-			var priority: float = costs[c] + distance
-			if priority < best_score:
-				best_score = priority
-				best_index = i
-		var current := frontier[best_index]
-		frontier.remove_at(best_index)
-		if current == goal:
-			var step := goal
-			while previous.has(step) and previous[step] != start:
-				step = previous[step]
-			return step
-		for n in range(4):
-			var d: Vector2 = DIRS[(n + variant) % 4]
-			var neighbor := current + Vector2i(d)
-			var cost: float = costs[current] + tile_cost(neighbor)
-			if cost < costs.get(neighbor, INF):
-				costs[neighbor] = cost
-				previous[neighbor] = current
-				if not frontier.has(neighbor):
-					frontier.append(neighbor)
-	return start
-
-func update_enemy(t: Dictionary, dt: float) -> void:
-	t.ai_timer -= dt
-	var pos: Vector2 = t.pos
-	var target: Vector2 = t.waypoint
-	if pos.distance_to(target) < 0.2 or t.stuck > 1.2:
-		var cell := Vector2i(roundi((pos.x - 16) / 32), roundi((pos.y - 16) / 32))
-		var goal := Vector2i(6, 12)
-		var p := player()
-		# Scouts hunt nearby players; other types keep pressure on the headquarters.
-		if t.kind == "scout" and not p.is_empty() and pos.distance_to(p.pos) < 190:
-			goal = Vector2i(p.pos / 32)
-		var step := next_step(cell, goal, int(t.id) % 4)
-		t.waypoint = Vector2(step * 32) + Vector2(16, 16)
-		t.stuck = 0.0
-		target = t.waypoint
-	var difference: Vector2 = target - pos
-	if difference.length() > 0.1:
-		var axis := Vector2.ZERO
-		if absf(difference.x) > 0.1:
-			axis.x = signf(difference.x)
-			t.dir = 1 if axis.x > 0 else 3
-		else:
-			axis.y = signf(difference.y)
-			t.dir = 2 if axis.y > 0 else 0
-		var remaining := absf(difference.x) if axis.x != 0 else absf(difference.y)
-		var amount := minf(STATS[t.kind].speed * dt, remaining)
-		if move_tank(t, axis * amount):
-			t.stuck = 0.0
-		else:
-			t.stuck += dt
-	# Shoot in travel direction; aim at a nearby aligned player between route segments.
-	var p := player()
-	if not p.is_empty() and t.ai_timer <= 0:
-		var diff: Vector2 = p.pos - t.pos
-		if diff.length() < 220 and (absf(diff.x) < 11 or absf(diff.y) < 11):
-			t.dir = (2 if diff.y > 0 else 0) if absf(diff.x) < 11 else (1 if diff.x > 0 else 3)
-		t.ai_timer = 0.5
-	fire(t)
-
-func fire(t: Dictionary) -> bool:
-	if t.cooldown > 0 or t.born > 0:
+func fire(tank: Dictionary) -> bool:
+	if tick < tank.fire_at:
 		return false
 	var active := 0
 	for b in bullets:
-		if b.owner == t.id:
+		if b.owner == tank.id and not b.dead:
 			active += 1
-	if active >= (2 if t.team == 0 else 1):
+	if active >= MAX_BULLETS:
 		return false
-	var direction: Vector2 = DIRS[t.dir]
-	bullets.append({"pos": t.pos + direction * 15, "dir": t.dir, "team": t.team, "owner": t.id, "speed": STATS[t.kind].bullet, "dead": false})
-	t.cooldown = STATS[t.kind].reload
-	if t.team == 0:
-		events.append("fire")
+	bullets.append({"id": next_bullet_id, "pos": tank.pos + DIRS[tank.dir] * 15,
+		"dir": tank.dir, "team": tank.team, "owner": tank.id, "speed": BULLET_SPEED, "dead": false})
+	next_bullet_id += 1
+	tank.fire_at = tick + FIRE_TICKS
+	tank.cooldown = FIRE_TICKS * STEP
+	events.append("fire")
 	return true
 
 func update_bullets(dt: float) -> void:
-	# Global microsteps preserve opposing bullet collision and prevent tunnelling at low frame rates.
-	var steps := maxi(1, ceili(dt * 300.0 / 3.0))
+	# Global <=3px microsteps stop fast bullets tunnelling through tanks, walls or each other.
+	var steps := maxi(1, ceili(dt * BULLET_SPEED / 3.0))
 	for _substep in range(steps):
 		for b in bullets:
 			if b.dead:
@@ -330,20 +258,17 @@ func update_bullets(dt: float) -> void:
 			if p.x < 0 or p.y < 0 or p.x >= SIZE or p.y >= SIZE:
 				b.dead = true
 				continue
-			var r := Rect2(p - Vector2(2, 2), Vector2(4, 4))
-			if base_alive and r.intersects(base_rect):
-				b.dead = true
-				# Player fire cannot destroy the headquarters: friendly-fire protection.
-				if b.team == 1:
-					base_alive = false
-					add_explosion(base_rect.get_center(), 28)
-					state = "lost"
-					events.append("lose")
-				continue
-			if hit_terrain(b):
+			var rect := Rect2(p - Vector2(2, 2), Vector2(4, 4))
+			for base in bases:
+				if rect.intersects(base_rect(base.team)):
+					b.dead = true
+					if b.team != base.team:
+						damage_base(base.team)
+					break
+			if b.dead or hit_terrain(b):
 				continue
 			for other in bullets:
-				if other == b or other.dead or other.team == b.team:
+				if other.id == b.id or other.dead or other.team == b.team:
 					continue
 				if p.distance_squared_to(other.pos) < 49:
 					b.dead = true
@@ -352,13 +277,13 @@ func update_bullets(dt: float) -> void:
 					break
 			if b.dead:
 				continue
-			for t in tanks.duplicate():
-				if t.team == b.team or t.born > 0:
+			for tank in tanks.duplicate():
+				if tank.team == b.team:
 					continue
-				if r.intersects(tank_rect(t.pos)):
+				if rect.intersects(tank_rect(tank.pos)):
 					b.dead = true
-					if t.shield <= 0:
-						damage_tank(t)
+					if tick >= tank.shield_until:
+						damage_tank(tank, b.owner)
 					else:
 						add_explosion(p, 5)
 					break
@@ -371,14 +296,14 @@ func hit_terrain(b: Dictionary) -> bool:
 		var cell := Vector2i(floor((p.x + offset.x) / 16), floor((p.y + offset.y) / 16))
 		if not cells.has(cell):
 			cells.append(cell)
+	# Steel always absorbs a mixed-edge hit before adjacent brick can be damaged.
 	for cell in cells:
-		var kind: String = terrain.get(cell, "")
-		if kind == "S":
+		if terrain.get(cell, "") == "S":
 			b.dead = true
 			add_explosion(p, 4)
 			return true
-		if kind == "B":
-			# Shatter one 16 px-deep course across a 32 px masonry tile, leaving visible half-wall rubble.
+	for cell in cells:
+		if terrain.get(cell, "") == "B":
 			var origin := Vector2i(floori(cell.x / 2.0) * 2, floori(cell.y / 2.0) * 2)
 			for i in range(2):
 				var victim := Vector2i(origin.x + i, cell.y) if b.dir % 2 == 0 else Vector2i(cell.x, origin.y + i)
@@ -390,39 +315,80 @@ func hit_terrain(b: Dictionary) -> bool:
 			return true
 	return false
 
-func damage_tank(t: Dictionary) -> void:
-	t.hp -= 1
-	t.hit = 0.15
-	if t.hp > 0:
-		events.append("armor")
-		return
-	var pos: Vector2 = t.pos
-	add_explosion(pos, 20)
-	tanks.erase(t)
-	if t.team == 0:
-		lives -= 1
-		flash_timer = 0.3
-		events.append("death")
-		if lives <= 0:
-			state = "lost"
-			events.append("lose")
-		else:
-			respawn_timer = 1.3
-	else:
-		killed += 1
-		score += STATS[t.kind].points
-		events.append("kill")
-		if killed in [5, 10, 15]:
-			# A shield supply appears in a guaranteed reachable home-side lane.
-			powerups.append({"pos": Vector2(144 if killed != 10 else 272, 368), "life": 16.0})
+func damage_tank(tank: Dictionary, attacker: int = -1) -> bool:
+	if not tanks.has(tank) or tick < tank.shield_until:
+		return false
+	if players.has(attacker) and players[attacker].team == tank.team:
+		return false
+	add_explosion(tank.pos, 20)
+	tanks.erase(tank)
+	if players.has(tank.id):
+		var victim: Dictionary = players[tank.id]
+		victim.deaths += 1
+		victim.respawn_at = tick + RESPAWN_TICKS
+		victim.respawn = RESPAWN_DELAY
+	if players.has(attacker):
+		players[attacker].kills += 1
+	events.append("death")
+	return true
 
-func collect_powerup(t: Dictionary) -> void:
-	for item in powerups.duplicate():
-		if t.pos.distance_to(item.pos) < 23:
-			t.shield = 8.0
-			powerups.erase(item)
-			score += 250
-			events.append("powerup")
+func damage_base(team: int) -> bool:
+	var base: Dictionary = bases[team]
+	if base.hp <= 0 or tick < base.shield_until:
+		return false
+	base.hp -= 1
+	base.shield_until = tick + BASE_SHIELD_TICKS
+	base.shield = BASE_INVULNERABILITY
+	add_explosion(base_rect(team).get_center(), 28 if base.hp == 0 else 15)
+	events.append("armor" if base.hp > 0 else "kill")
+	return true
+
+func _check_winner() -> void:
+	# Evaluate after every bullet in the fixed tick, not after the first base hit.
+	if bases[0].hp <= 0 and bases[1].hp <= 0:
+		winner = 2
+	elif bases[0].hp <= 0:
+		winner = 1
+	elif bases[1].hp <= 0:
+		winner = 0
+	if winner != -1:
+		state = "ended"
+		events.append("win")
 
 func add_explosion(pos: Vector2, radius: float) -> void:
-	effects.append({"pos": pos, "radius": radius, "life": 0.35, "max_life": 0.35})
+	effects.append({"pos": pos, "radius": radius, "size": radius, "life": 0.35, "max_life": 0.35})
+
+func _pack_terrain() -> PackedByteArray:
+	var packed := PackedByteArray()
+	packed.resize(26 * 26)
+	for cell in terrain:
+		packed[cell.y * 26 + cell.x] = ["", "B", "S", "W", "G"].find(terrain[cell])
+	return packed
+
+func _unpack_terrain(packed: PackedByteArray) -> void:
+	terrain.clear()
+	for i in range(mini(packed.size(), 26 * 26)):
+		if packed[i] > 0 and packed[i] <= 4:
+			terrain[Vector2i(i % 26, i / 26)] = ["", "B", "S", "W", "G"][packed[i]]
+
+func snapshot() -> Dictionary:
+	return {"state": state, "winner": winner, "elapsed": elapsed, "tick": tick,
+		"terrain": _pack_terrain(), "tanks": tanks.duplicate(true), "bullets": bullets.duplicate(true),
+		"effects": effects.duplicate(true), "players": players.duplicate(true), "bases": bases.duplicate(true),
+		"next_bullet_id": next_bullet_id}
+
+func apply_snapshot(data: Dictionary) -> void:
+	# Called only for an already validated authority RPC; clients never simulate this copy.
+	state = data.state
+	winner = data.winner
+	elapsed = data.elapsed
+	tick = data.tick
+	_unpack_terrain(data.terrain)
+	tanks.assign(data.tanks.duplicate(true))
+	bullets.assign(data.bullets.duplicate(true))
+	effects.assign(data.effects.duplicate(true))
+	players = data.players.duplicate(true)
+	bases.assign(data.bases.duplicate(true))
+	next_bullet_id = data.next_bullet_id
+	_accumulator = 0.0
+	events.clear()
