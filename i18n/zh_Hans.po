@@ -1,0 +1,11 @@
+msgid ""
+msgstr ""
+"Content-Type: text/plain; charset=UTF-8\n"
+"Language: zh_Hans\n"
+"Plural-Forms: nplurals=1; plural=0;\n"
+
+msgid "独立 ENet 红蓝坦克对抗，等待接入派对房间。"
+msgstr "独立 ENet 红蓝坦克对抗，等待接入派对房间。"
+
+msgid "铁鹰防线"
+msgstr "铁鹰防线"
