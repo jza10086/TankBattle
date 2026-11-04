@@ -1,0 +1,475 @@
+[gd_scene format=3]
+
+[node name="BattlefieldLayout" type="Node2D"]
+
+[node name="B" type="Node2D" parent="."]
+
+
+[node name="Tile10_0" type="Polygon2D" parent="B"]
+position = Vector2(320,0)
+color = Color(0.55,0.29,0.22,1)
+polygon = PackedVector2Array(0,0,32,0,32,32,0,32)
+
+[node name="Tile12_0" type="Polygon2D" parent="B"]
+position = Vector2(384,0)
+color = Color(0.55,0.29,0.22,1)
+polygon = PackedVector2Array(0,0,32,0,32,32,0,32)
+
+[node name="Tile1_1" type="Polygon2D" parent="B"]
+position = Vector2(32,32)
+color = Color(0.55,0.29,0.22,1)
+polygon = PackedVector2Array(0,0,32,0,32,32,0,32)
+
+[node name="Tile2_1" type="Polygon2D" parent="B"]
+position = Vector2(64,32)
+color = Color(0.55,0.29,0.22,1)
+polygon = PackedVector2Array(0,0,32,0,32,32,0,32)
+
+[node name="Tile3_1" type="Polygon2D" parent="B"]
+position = Vector2(96,32)
+color = Color(0.55,0.29,0.22,1)
+polygon = PackedVector2Array(0,0,32,0,32,32,0,32)
+
+[node name="Tile10_1" type="Polygon2D" parent="B"]
+position = Vector2(320,32)
+color = Color(0.55,0.29,0.22,1)
+polygon = PackedVector2Array(0,0,32,0,32,32,0,32)
+
+[node name="Tile11_1" type="Polygon2D" parent="B"]
+position = Vector2(352,32)
+color = Color(0.55,0.29,0.22,1)
+polygon = PackedVector2Array(0,0,32,0,32,32,0,32)
+
+[node name="Tile12_1" type="Polygon2D" parent="B"]
+position = Vector2(384,32)
+color = Color(0.55,0.29,0.22,1)
+polygon = PackedVector2Array(0,0,32,0,32,32,0,32)
+
+[node name="Tile19_1" type="Polygon2D" parent="B"]
+position = Vector2(608,32)
+color = Color(0.55,0.29,0.22,1)
+polygon = PackedVector2Array(0,0,32,0,32,32,0,32)
+
+[node name="Tile20_1" type="Polygon2D" parent="B"]
+position = Vector2(640,32)
+color = Color(0.55,0.29,0.22,1)
+polygon = PackedVector2Array(0,0,32,0,32,32,0,32)
+
+[node name="Tile21_1" type="Polygon2D" parent="B"]
+position = Vector2(672,32)
+color = Color(0.55,0.29,0.22,1)
+polygon = PackedVector2Array(0,0,32,0,32,32,0,32)
+
+[node name="Tile3_2" type="Polygon2D" parent="B"]
+position = Vector2(96,64)
+color = Color(0.55,0.29,0.22,1)
+polygon = PackedVector2Array(0,0,32,0,32,32,0,32)
+
+[node name="Tile6_2" type="Polygon2D" parent="B"]
+position = Vector2(192,64)
+color = Color(0.55,0.29,0.22,1)
+polygon = PackedVector2Array(0,0,32,0,32,32,0,32)
+
+[node name="Tile7_2" type="Polygon2D" parent="B"]
+position = Vector2(224,64)
+color = Color(0.55,0.29,0.22,1)
+polygon = PackedVector2Array(0,0,32,0,32,32,0,32)
+
+[node name="Tile9_2" type="Polygon2D" parent="B"]
+position = Vector2(288,64)
+color = Color(0.55,0.29,0.22,1)
+polygon = PackedVector2Array(0,0,32,0,32,32,0,32)
+
+[node name="Tile13_2" type="Polygon2D" parent="B"]
+position = Vector2(416,64)
+color = Color(0.55,0.29,0.22,1)
+polygon = PackedVector2Array(0,0,32,0,32,32,0,32)
+
+[node name="Tile15_2" type="Polygon2D" parent="B"]
+position = Vector2(480,64)
+color = Color(0.55,0.29,0.22,1)
+polygon = PackedVector2Array(0,0,32,0,32,32,0,32)
+
+[node name="Tile16_2" type="Polygon2D" parent="B"]
+position = Vector2(512,64)
+color = Color(0.55,0.29,0.22,1)
+polygon = PackedVector2Array(0,0,32,0,32,32,0,32)
+
+[node name="Tile19_2" type="Polygon2D" parent="B"]
+position = Vector2(608,64)
+color = Color(0.55,0.29,0.22,1)
+polygon = PackedVector2Array(0,0,32,0,32,32,0,32)
+
+[node name="Tile9_4" type="Polygon2D" parent="B"]
+position = Vector2(288,128)
+color = Color(0.55,0.29,0.22,1)
+polygon = PackedVector2Array(0,0,32,0,32,32,0,32)
+
+[node name="Tile13_4" type="Polygon2D" parent="B"]
+position = Vector2(416,128)
+color = Color(0.55,0.29,0.22,1)
+polygon = PackedVector2Array(0,0,32,0,32,32,0,32)
+
+[node name="Tile1_6" type="Polygon2D" parent="B"]
+position = Vector2(32,192)
+color = Color(0.55,0.29,0.22,1)
+polygon = PackedVector2Array(0,0,32,0,32,32,0,32)
+
+[node name="Tile6_6" type="Polygon2D" parent="B"]
+position = Vector2(192,192)
+color = Color(0.55,0.29,0.22,1)
+polygon = PackedVector2Array(0,0,32,0,32,32,0,32)
+
+[node name="Tile7_6" type="Polygon2D" parent="B"]
+position = Vector2(224,192)
+color = Color(0.55,0.29,0.22,1)
+polygon = PackedVector2Array(0,0,32,0,32,32,0,32)
+
+[node name="Tile15_6" type="Polygon2D" parent="B"]
+position = Vector2(480,192)
+color = Color(0.55,0.29,0.22,1)
+polygon = PackedVector2Array(0,0,32,0,32,32,0,32)
+
+[node name="Tile16_6" type="Polygon2D" parent="B"]
+position = Vector2(512,192)
+color = Color(0.55,0.29,0.22,1)
+polygon = PackedVector2Array(0,0,32,0,32,32,0,32)
+
+[node name="Tile21_6" type="Polygon2D" parent="B"]
+position = Vector2(672,192)
+color = Color(0.55,0.29,0.22,1)
+polygon = PackedVector2Array(0,0,32,0,32,32,0,32)
+
+[node name="Tile9_8" type="Polygon2D" parent="B"]
+position = Vector2(288,256)
+color = Color(0.55,0.29,0.22,1)
+polygon = PackedVector2Array(0,0,32,0,32,32,0,32)
+
+[node name="Tile13_8" type="Polygon2D" parent="B"]
+position = Vector2(416,256)
+color = Color(0.55,0.29,0.22,1)
+polygon = PackedVector2Array(0,0,32,0,32,32,0,32)
+
+[node name="Tile3_10" type="Polygon2D" parent="B"]
+position = Vector2(96,320)
+color = Color(0.55,0.29,0.22,1)
+polygon = PackedVector2Array(0,0,32,0,32,32,0,32)
+
+[node name="Tile6_10" type="Polygon2D" parent="B"]
+position = Vector2(192,320)
+color = Color(0.55,0.29,0.22,1)
+polygon = PackedVector2Array(0,0,32,0,32,32,0,32)
+
+[node name="Tile7_10" type="Polygon2D" parent="B"]
+position = Vector2(224,320)
+color = Color(0.55,0.29,0.22,1)
+polygon = PackedVector2Array(0,0,32,0,32,32,0,32)
+
+[node name="Tile9_10" type="Polygon2D" parent="B"]
+position = Vector2(288,320)
+color = Color(0.55,0.29,0.22,1)
+polygon = PackedVector2Array(0,0,32,0,32,32,0,32)
+
+[node name="Tile13_10" type="Polygon2D" parent="B"]
+position = Vector2(416,320)
+color = Color(0.55,0.29,0.22,1)
+polygon = PackedVector2Array(0,0,32,0,32,32,0,32)
+
+[node name="Tile15_10" type="Polygon2D" parent="B"]
+position = Vector2(480,320)
+color = Color(0.55,0.29,0.22,1)
+polygon = PackedVector2Array(0,0,32,0,32,32,0,32)
+
+[node name="Tile16_10" type="Polygon2D" parent="B"]
+position = Vector2(512,320)
+color = Color(0.55,0.29,0.22,1)
+polygon = PackedVector2Array(0,0,32,0,32,32,0,32)
+
+[node name="Tile19_10" type="Polygon2D" parent="B"]
+position = Vector2(608,320)
+color = Color(0.55,0.29,0.22,1)
+polygon = PackedVector2Array(0,0,32,0,32,32,0,32)
+
+[node name="Tile1_11" type="Polygon2D" parent="B"]
+position = Vector2(32,352)
+color = Color(0.55,0.29,0.22,1)
+polygon = PackedVector2Array(0,0,32,0,32,32,0,32)
+
+[node name="Tile2_11" type="Polygon2D" parent="B"]
+position = Vector2(64,352)
+color = Color(0.55,0.29,0.22,1)
+polygon = PackedVector2Array(0,0,32,0,32,32,0,32)
+
+[node name="Tile3_11" type="Polygon2D" parent="B"]
+position = Vector2(96,352)
+color = Color(0.55,0.29,0.22,1)
+polygon = PackedVector2Array(0,0,32,0,32,32,0,32)
+
+[node name="Tile10_11" type="Polygon2D" parent="B"]
+position = Vector2(320,352)
+color = Color(0.55,0.29,0.22,1)
+polygon = PackedVector2Array(0,0,32,0,32,32,0,32)
+
+[node name="Tile11_11" type="Polygon2D" parent="B"]
+position = Vector2(352,352)
+color = Color(0.55,0.29,0.22,1)
+polygon = PackedVector2Array(0,0,32,0,32,32,0,32)
+
+[node name="Tile12_11" type="Polygon2D" parent="B"]
+position = Vector2(384,352)
+color = Color(0.55,0.29,0.22,1)
+polygon = PackedVector2Array(0,0,32,0,32,32,0,32)
+
+[node name="Tile19_11" type="Polygon2D" parent="B"]
+position = Vector2(608,352)
+color = Color(0.55,0.29,0.22,1)
+polygon = PackedVector2Array(0,0,32,0,32,32,0,32)
+
+[node name="Tile20_11" type="Polygon2D" parent="B"]
+position = Vector2(640,352)
+color = Color(0.55,0.29,0.22,1)
+polygon = PackedVector2Array(0,0,32,0,32,32,0,32)
+
+[node name="Tile21_11" type="Polygon2D" parent="B"]
+position = Vector2(672,352)
+color = Color(0.55,0.29,0.22,1)
+polygon = PackedVector2Array(0,0,32,0,32,32,0,32)
+
+[node name="Tile10_12" type="Polygon2D" parent="B"]
+position = Vector2(320,384)
+color = Color(0.55,0.29,0.22,1)
+polygon = PackedVector2Array(0,0,32,0,32,32,0,32)
+
+[node name="Tile12_12" type="Polygon2D" parent="B"]
+position = Vector2(384,384)
+color = Color(0.55,0.29,0.22,1)
+polygon = PackedVector2Array(0,0,32,0,32,32,0,32)
+
+[node name="S" type="Node2D" parent="."]
+
+
+[node name="Tile11_3" type="Polygon2D" parent="S"]
+position = Vector2(352,96)
+color = Color(0.6,0.62,0.57,1)
+polygon = PackedVector2Array(0,0,32,0,32,32,0,32)
+
+[node name="Tile3_4" type="Polygon2D" parent="S"]
+position = Vector2(96,128)
+color = Color(0.6,0.62,0.57,1)
+polygon = PackedVector2Array(0,0,32,0,32,32,0,32)
+
+[node name="Tile19_4" type="Polygon2D" parent="S"]
+position = Vector2(608,128)
+color = Color(0.6,0.62,0.57,1)
+polygon = PackedVector2Array(0,0,32,0,32,32,0,32)
+
+[node name="Tile10_6" type="Polygon2D" parent="S"]
+position = Vector2(320,192)
+color = Color(0.6,0.62,0.57,1)
+polygon = PackedVector2Array(0,0,32,0,32,32,0,32)
+
+[node name="Tile12_6" type="Polygon2D" parent="S"]
+position = Vector2(384,192)
+color = Color(0.6,0.62,0.57,1)
+polygon = PackedVector2Array(0,0,32,0,32,32,0,32)
+
+[node name="Tile3_8" type="Polygon2D" parent="S"]
+position = Vector2(96,256)
+color = Color(0.6,0.62,0.57,1)
+polygon = PackedVector2Array(0,0,32,0,32,32,0,32)
+
+[node name="Tile19_8" type="Polygon2D" parent="S"]
+position = Vector2(608,256)
+color = Color(0.6,0.62,0.57,1)
+polygon = PackedVector2Array(0,0,32,0,32,32,0,32)
+
+[node name="Tile11_9" type="Polygon2D" parent="S"]
+position = Vector2(352,288)
+color = Color(0.6,0.62,0.57,1)
+polygon = PackedVector2Array(0,0,32,0,32,32,0,32)
+
+[node name="W" type="Node2D" parent="."]
+
+
+[node name="Tile3_5" type="Polygon2D" parent="W"]
+position = Vector2(96,160)
+color = Color(0.2,0.42,0.5,1)
+polygon = PackedVector2Array(0,0,32,0,32,32,0,32)
+
+[node name="Tile9_5" type="Polygon2D" parent="W"]
+position = Vector2(288,160)
+color = Color(0.2,0.42,0.5,1)
+polygon = PackedVector2Array(0,0,32,0,32,32,0,32)
+
+[node name="Tile10_5" type="Polygon2D" parent="W"]
+position = Vector2(320,160)
+color = Color(0.2,0.42,0.5,1)
+polygon = PackedVector2Array(0,0,32,0,32,32,0,32)
+
+[node name="Tile12_5" type="Polygon2D" parent="W"]
+position = Vector2(384,160)
+color = Color(0.2,0.42,0.5,1)
+polygon = PackedVector2Array(0,0,32,0,32,32,0,32)
+
+[node name="Tile13_5" type="Polygon2D" parent="W"]
+position = Vector2(416,160)
+color = Color(0.2,0.42,0.5,1)
+polygon = PackedVector2Array(0,0,32,0,32,32,0,32)
+
+[node name="Tile19_5" type="Polygon2D" parent="W"]
+position = Vector2(608,160)
+color = Color(0.2,0.42,0.5,1)
+polygon = PackedVector2Array(0,0,32,0,32,32,0,32)
+
+[node name="Tile3_7" type="Polygon2D" parent="W"]
+position = Vector2(96,224)
+color = Color(0.2,0.42,0.5,1)
+polygon = PackedVector2Array(0,0,32,0,32,32,0,32)
+
+[node name="Tile9_7" type="Polygon2D" parent="W"]
+position = Vector2(288,224)
+color = Color(0.2,0.42,0.5,1)
+polygon = PackedVector2Array(0,0,32,0,32,32,0,32)
+
+[node name="Tile10_7" type="Polygon2D" parent="W"]
+position = Vector2(320,224)
+color = Color(0.2,0.42,0.5,1)
+polygon = PackedVector2Array(0,0,32,0,32,32,0,32)
+
+[node name="Tile12_7" type="Polygon2D" parent="W"]
+position = Vector2(384,224)
+color = Color(0.2,0.42,0.5,1)
+polygon = PackedVector2Array(0,0,32,0,32,32,0,32)
+
+[node name="Tile13_7" type="Polygon2D" parent="W"]
+position = Vector2(416,224)
+color = Color(0.2,0.42,0.5,1)
+polygon = PackedVector2Array(0,0,32,0,32,32,0,32)
+
+[node name="Tile19_7" type="Polygon2D" parent="W"]
+position = Vector2(608,224)
+color = Color(0.2,0.42,0.5,1)
+polygon = PackedVector2Array(0,0,32,0,32,32,0,32)
+
+[node name="G" type="Node2D" parent="."]
+
+
+[node name="Tile1_3" type="Polygon2D" parent="G"]
+position = Vector2(32,96)
+color = Color(0.2,0.38,0.22,1)
+polygon = PackedVector2Array(0,0,32,0,32,32,0,32)
+
+[node name="Tile6_3" type="Polygon2D" parent="G"]
+position = Vector2(192,96)
+color = Color(0.2,0.38,0.22,1)
+polygon = PackedVector2Array(0,0,32,0,32,32,0,32)
+
+[node name="Tile7_3" type="Polygon2D" parent="G"]
+position = Vector2(224,96)
+color = Color(0.2,0.38,0.22,1)
+polygon = PackedVector2Array(0,0,32,0,32,32,0,32)
+
+[node name="Tile15_3" type="Polygon2D" parent="G"]
+position = Vector2(480,96)
+color = Color(0.2,0.38,0.22,1)
+polygon = PackedVector2Array(0,0,32,0,32,32,0,32)
+
+[node name="Tile16_3" type="Polygon2D" parent="G"]
+position = Vector2(512,96)
+color = Color(0.2,0.38,0.22,1)
+polygon = PackedVector2Array(0,0,32,0,32,32,0,32)
+
+[node name="Tile21_3" type="Polygon2D" parent="G"]
+position = Vector2(672,96)
+color = Color(0.2,0.38,0.22,1)
+polygon = PackedVector2Array(0,0,32,0,32,32,0,32)
+
+[node name="Tile1_4" type="Polygon2D" parent="G"]
+position = Vector2(32,128)
+color = Color(0.2,0.38,0.22,1)
+polygon = PackedVector2Array(0,0,32,0,32,32,0,32)
+
+[node name="Tile6_4" type="Polygon2D" parent="G"]
+position = Vector2(192,128)
+color = Color(0.2,0.38,0.22,1)
+polygon = PackedVector2Array(0,0,32,0,32,32,0,32)
+
+[node name="Tile7_4" type="Polygon2D" parent="G"]
+position = Vector2(224,128)
+color = Color(0.2,0.38,0.22,1)
+polygon = PackedVector2Array(0,0,32,0,32,32,0,32)
+
+[node name="Tile15_4" type="Polygon2D" parent="G"]
+position = Vector2(480,128)
+color = Color(0.2,0.38,0.22,1)
+polygon = PackedVector2Array(0,0,32,0,32,32,0,32)
+
+[node name="Tile16_4" type="Polygon2D" parent="G"]
+position = Vector2(512,128)
+color = Color(0.2,0.38,0.22,1)
+polygon = PackedVector2Array(0,0,32,0,32,32,0,32)
+
+[node name="Tile21_4" type="Polygon2D" parent="G"]
+position = Vector2(672,128)
+color = Color(0.2,0.38,0.22,1)
+polygon = PackedVector2Array(0,0,32,0,32,32,0,32)
+
+[node name="Tile1_8" type="Polygon2D" parent="G"]
+position = Vector2(32,256)
+color = Color(0.2,0.38,0.22,1)
+polygon = PackedVector2Array(0,0,32,0,32,32,0,32)
+
+[node name="Tile6_8" type="Polygon2D" parent="G"]
+position = Vector2(192,256)
+color = Color(0.2,0.38,0.22,1)
+polygon = PackedVector2Array(0,0,32,0,32,32,0,32)
+
+[node name="Tile7_8" type="Polygon2D" parent="G"]
+position = Vector2(224,256)
+color = Color(0.2,0.38,0.22,1)
+polygon = PackedVector2Array(0,0,32,0,32,32,0,32)
+
+[node name="Tile15_8" type="Polygon2D" parent="G"]
+position = Vector2(480,256)
+color = Color(0.2,0.38,0.22,1)
+polygon = PackedVector2Array(0,0,32,0,32,32,0,32)
+
+[node name="Tile16_8" type="Polygon2D" parent="G"]
+position = Vector2(512,256)
+color = Color(0.2,0.38,0.22,1)
+polygon = PackedVector2Array(0,0,32,0,32,32,0,32)
+
+[node name="Tile21_8" type="Polygon2D" parent="G"]
+position = Vector2(672,256)
+color = Color(0.2,0.38,0.22,1)
+polygon = PackedVector2Array(0,0,32,0,32,32,0,32)
+
+[node name="Tile1_9" type="Polygon2D" parent="G"]
+position = Vector2(32,288)
+color = Color(0.2,0.38,0.22,1)
+polygon = PackedVector2Array(0,0,32,0,32,32,0,32)
+
+[node name="Tile6_9" type="Polygon2D" parent="G"]
+position = Vector2(192,288)
+color = Color(0.2,0.38,0.22,1)
+polygon = PackedVector2Array(0,0,32,0,32,32,0,32)
+
+[node name="Tile7_9" type="Polygon2D" parent="G"]
+position = Vector2(224,288)
+color = Color(0.2,0.38,0.22,1)
+polygon = PackedVector2Array(0,0,32,0,32,32,0,32)
+
+[node name="Tile15_9" type="Polygon2D" parent="G"]
+position = Vector2(480,288)
+color = Color(0.2,0.38,0.22,1)
+polygon = PackedVector2Array(0,0,32,0,32,32,0,32)
+
+[node name="Tile16_9" type="Polygon2D" parent="G"]
+position = Vector2(512,288)
+color = Color(0.2,0.38,0.22,1)
+polygon = PackedVector2Array(0,0,32,0,32,32,0,32)
+
+[node name="Tile21_9" type="Polygon2D" parent="G"]
+position = Vector2(672,288)
+color = Color(0.2,0.38,0.22,1)
+polygon = PackedVector2Array(0,0,32,0,32,32,0,32)

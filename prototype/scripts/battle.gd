@@ -27,24 +27,8 @@ const BASE_HP := 5
 const BASE_INVULNERABILITY := 1.0
 const BASE_SHIELD_TICKS := ceili(BASE_INVULNERABILITY * TICK_RATE)
 const DIRS := [Vector2.UP, Vector2.RIGHT, Vector2.DOWN, Vector2.LEFT]
-# Both horizontal and vertical mirrors: same cover, travel distance and spawn space.
-# The original center is unchanged; five playable columns are added at each
-# side. North/south and east/west mirrors give both teams identical wing routes.
-const MAP := [
-	"..........B.B..........",
-	".BBB......BBB......BBB.",
-	"...B..BB.B...B.BB..B...",
-	".G....GG...S...GG....G.",
-	".G.S..GG.B...B.GG..S.G.",
-	"...W.....WW.WW.....W...",
-	".B....BB..S.S..BB....B.",
-	"...W.....WW.WW.....W...",
-	".G.S..GG.B...B.GG..S.G.",
-	".G....GG...S...GG....G.",
-	"...B..BB.B...B.BB..B...",
-	".BBB......BBB......BBB.",
-	"..........B.B.........."
-]
+const FIELD_LAYOUT: PackedScene = preload("res://scenes/battlefield_layout.tscn")
+var initial_terrain: Dictionary
 
 var state := "lobby"
 var winner := -1 # 0 red, 1 blue, 2 simultaneous destruction / draw.
@@ -60,20 +44,20 @@ var bases: Array[Dictionary] = []
 var next_bullet_id := 1
 var _accumulator := 0.0
 
-func _init() -> void:
+func _init(layout: Node2D = null) -> void:
+	var field: Node2D = FIELD_LAYOUT.instantiate() if layout == null else layout
+	for group: Node2D in field.get_children():
+		for tile: Node2D in group.get_children():
+			var origin: Vector2i = Vector2i((field.to_local(tile.global_position) / 16.0).round())
+			for y: int in 2:
+				for x: int in 2:
+					initial_terrain[origin + Vector2i(x,y)] = str(group.name)
+	if layout == null: field.free()
 	_load_terrain()
 	_reset_bases()
 
 func _load_terrain() -> void:
-	terrain.clear()
-	for y in range(ROWS):
-		assert(MAP[y].length() == COLUMNS)
-		for x in range(COLUMNS):
-			var kind: String = MAP[y].substr(x, 1)
-			if kind in ["B", "S", "W", "G"]:
-				for oy in range(2):
-					for ox in range(2):
-						terrain[Vector2i(x * 2 + ox, y * 2 + oy)] = kind
+	terrain = initial_terrain.duplicate()
 
 func _reset_bases() -> void:
 	bases.clear()

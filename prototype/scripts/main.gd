@@ -30,37 +30,39 @@ var message := ""
 var sounds: Dictionary = {}
 var voices: Array[AudioStreamPlayer] = []
 var voice_index := 0
-var ui: Control
-var entry_panel: Control
-var room_panel: Control
-var connecting_panel: Control
-var menu_panel: Control
-var result_panel: Control
-var name_field: LineEdit
-var address_field: LineEdit
-var port_field: SpinBox
-var team_field: OptionButton
-var ready_button: Button
-var start_button: Button
-var menu_button: Button
-var status_label: Label
-var room_status: Label
-var result_label: Label
-var rematch_button: Button
-var room_button: Button
-var confirm_dialog: ConfirmationDialog
+@onready var ui: Control = %Ui
+@onready var entry_panel: Control = %EntryPanel
+@onready var room_panel: Control = %RoomPanel
+@onready var connecting_panel: Control = %ConnectingPanel
+@onready var menu_panel: Control = %MenuPanel
+@onready var result_panel: Control = %ResultPanel
+@onready var name_field: LineEdit = %NameField
+@onready var address_field: LineEdit = %AddressField
+@onready var port_field: SpinBox = %PortField
+@onready var team_field: OptionButton = %TeamField
+@onready var ready_button: Button = %ReadyButton
+@onready var start_button: Button = %StartButton
+@onready var menu_button: Button = %MenuButton
+@onready var status_label: Label = %StatusLabel
+@onready var room_status: Label = %RoomStatus
+@onready var result_label: Label = %ResultLabel
+@onready var rematch_button: Button = %RematchButton
+@onready var room_button: Button = %RoomButton
+@onready var confirm_dialog: ConfirmationDialog = %ConfirmDialog
 var pending_action := ""
 var viewport_size := DESIGN_SIZE
 var ui_origin := Vector2.ZERO
 var ui_scale := 1.0
 var field_origin := Vector2.ZERO
 var field_scale := 1.0
-var hud_layer: Control
-var menu_backdrop: ColorRect
+@onready var hud_layer: Control = %HudLayer
+@onready var menu_backdrop: ColorRect = %MenuBackdrop
 
 func _ready() -> void:
 	get_window().min_size = Vector2i(640, 480)
 	get_tree().auto_accept_quit = false
+	%BattlefieldLayout.hide()
+	net.battlefield_layout = %BattlefieldLayout
 	net.name = "Network"
 	net.changed.connect(_refresh)
 	net.notice.connect(_on_notice)
@@ -82,171 +84,9 @@ func _ready() -> void:
 		voices.append(voice)
 	for kind in ["fire", "brick", "armor", "kill", "death", "win", "lose"]:
 		sounds[kind] = synthesize(kind)
-	_build_ui()
 	get_viewport().size_changed.connect(_layout_viewport)
 	_layout_viewport()
 	_refresh()
-
-func _style(fill: Color, border: Color = Color("48534d")) -> StyleBoxFlat:
-	var style := StyleBoxFlat.new()
-	style.bg_color = fill
-	style.border_color = border
-	style.set_border_width_all(1)
-	style.content_margin_left = 9
-	style.content_margin_right = 9
-	style.content_margin_top = 4
-	style.content_margin_bottom = 4
-	return style
-
-func _control(parent: Control, rect: Rect2) -> Control:
-	var node := Control.new()
-	node.position = rect.position
-	node.size = rect.size
-	node.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	parent.add_child(node)
-	return node
-
-func _label(parent: Control, value: String, rect: Rect2, font_size: int = 13, color: Color = PAPER) -> Label:
-	var label := Label.new()
-	label.text = value
-	label.position = rect.position
-	label.size = rect.size
-	label.add_theme_font_size_override("font_size", font_size)
-	label.add_theme_color_override("font_color", color)
-	label.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	parent.add_child(label)
-	return label
-
-func _button(parent: Control, value: String, rect: Rect2, action: Callable, primary: bool = false) -> Button:
-	var button := Button.new()
-	button.text = value
-	button.position = rect.position
-	button.size = rect.size
-	button.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
-	if primary:
-		button.add_theme_stylebox_override("normal", _style(GOLD, GOLD))
-		button.add_theme_stylebox_override("hover", _style(GOLD.lightened(0.12), WHITE))
-		button.add_theme_stylebox_override("pressed", _style(GOLD.darkened(0.13), WHITE))
-		button.add_theme_color_override("font_color", INK)
-		button.add_theme_color_override("font_hover_color", INK)
-		button.add_theme_color_override("font_pressed_color", INK)
-	button.pressed.connect(action)
-	parent.add_child(button)
-	return button
-
-func _build_ui() -> void:
-	ui = Control.new()
-	ui.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	ui.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	var theme := Theme.new()
-	theme.default_font = FONT
-	theme.default_font_size = 13
-	for type in ["Button", "OptionButton"]:
-		theme.set_stylebox("normal", type, _style(Color("28332d")))
-		theme.set_stylebox("hover", type, _style(Color("3b4940"), PAPER))
-		theme.set_stylebox("pressed", type, _style(Color("1a211e"), GOLD))
-		theme.set_stylebox("focus", type, _style(Color(0, 0, 0, 0), GOLD))
-		theme.set_stylebox("disabled", type, _style(Color("1c2420"), Color("354039")))
-		theme.set_color("font_color", type, PAPER)
-		theme.set_color("font_disabled_color", type, Color("6b786f"))
-	theme.set_stylebox("normal", "LineEdit", _style(Color("101713")))
-	theme.set_stylebox("focus", "LineEdit", _style(Color("101713"), GOLD))
-	theme.set_color("font_color", "LineEdit", WHITE)
-	ui.theme = theme
-	add_child(ui)
-	entry_panel = _control(ui, Rect2(0, 0, 640, 480))
-	_label(entry_panel, "玩家名称", Rect2(150, 167, 100, 30), 11, MUTED)
-	name_field = LineEdit.new()
-	name_field.position = Vector2(260, 166)
-	name_field.size = Vector2(230, 31)
-	name_field.text = "Player"
-	name_field.max_length = 16
-	entry_panel.add_child(name_field)
-	_label(entry_panel, "房主地址", Rect2(150, 213, 110, 30), 11, MUTED)
-	address_field = LineEdit.new()
-	address_field.position = Vector2(260, 212)
-	address_field.size = Vector2(230, 31)
-	address_field.text = "127.0.0.1"
-	address_field.placeholder_text = "局域网 / 公网 IP"
-	address_field.max_length = 128
-	entry_panel.add_child(address_field)
-	_label(entry_panel, "UDP 端口", Rect2(150, 259, 110, 30), 11, MUTED)
-	port_field = SpinBox.new()
-	port_field.position = Vector2(260, 258)
-	port_field.size = Vector2(230, 31)
-	port_field.min_value = 1024
-	port_field.max_value = 65535
-	port_field.value = 7777
-	entry_panel.add_child(port_field)
-	_button(entry_panel, "创建房间", Rect2(150, 314, 164, 36), _host, true)
-	_button(entry_panel, "加入房间", Rect2(326, 314, 164, 36), _join)
-	status_label = _label(entry_panel, "", Rect2(112, 366, 416, 44), 12, RED)
-	status_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	status_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_label(entry_panel, "局域网 / IP 直连；公网房主需自行转发 UDP 端口。", Rect2(101, 422, 450, 22), 10, MUTED)
-	_label(entry_panel, "WASD / 方向键 移动　空格 开火　Esc 本地菜单", Rect2(101, 445, 450, 22), 10, PAPER)
-
-	room_panel = _control(ui, Rect2(0, 0, 640, 480))
-	_label(room_panel, "我的队伍", Rect2(30, 323, 90, 30), 11, MUTED)
-	team_field = OptionButton.new()
-	team_field.position = Vector2(113, 322)
-	team_field.size = Vector2(133, 32)
-	team_field.add_item("红队 / 北侧", 0)
-	team_field.add_item("蓝队 / 南侧", 1)
-	team_field.item_selected.connect(_team_selected)
-	room_panel.add_child(team_field)
-	ready_button = _button(room_panel, "准备", Rect2(258, 322, 122, 32), _toggle_ready)
-	start_button = _button(room_panel, "开始对战", Rect2(392, 322, 218, 32), _start, true)
-	room_status = _label(room_panel, "", Rect2(30, 368, 580, 40), 12, GOLD)
-	room_status.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	_button(room_panel, "离开房间", Rect2(452, 424, 158, 30), func(): _confirm("leave"))
-	_label(room_panel, "2–8 名真人玩家 · 每队最多 4 人 · 无 AI", Rect2(30, 427, 400, 22), 11, MUTED)
-
-	connecting_panel = _control(ui, Rect2(0, 0, 640, 480))
-	_label(connecting_panel, "正在连接房主…", Rect2(176, 216, 310, 32), 18, GOLD)
-	_button(connecting_panel, "取消连接", Rect2(232, 287, 176, 36), _leave)
-	hud_layer = Control.new()
-	hud_layer.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	hud_layer.theme = theme
-	add_child(hud_layer)
-	menu_button = _button(hud_layer, "菜单 / Esc", Rect2(0, 0, 110, 32), _toggle_menu)
-	menu_button.focus_mode = Control.FOCUS_NONE
-	for state in ["normal", "hover", "pressed", "focus"]:
-		var glass := _style(Color(0.03, 0.06, 0.04, 0.58 if state == "normal" else 0.85))
-		glass.set_border_width_all(0)
-		menu_button.add_theme_stylebox_override(state, glass)
-	# Full-window dimming is separate from the centered 640 × 480 menu content.
-	menu_backdrop = ColorRect.new()
-	menu_backdrop.color = Color(0.02, 0.04, 0.03, 0.75)
-	menu_backdrop.mouse_filter = Control.MOUSE_FILTER_STOP
-	add_child(menu_backdrop)
-	move_child(ui, get_child_count() - 1)
-
-	menu_panel = _control(ui, Rect2(0, 0, 640, 480))
-	_label(menu_panel, "本地菜单", Rect2(215, 130, 260, 35), 24, GOLD)
-	_label(menu_panel, "联机对战仍在继续；你的战车暂时停止操作。", Rect2(137, 183, 390, 28), 12, PAPER)
-	_button(menu_panel, "返回战场", Rect2(204, 230, 232, 36), _toggle_menu, true)
-	room_button = _button(menu_panel, "结束本局，返回房间", Rect2(204, 280, 232, 32), func(): _confirm("room"))
-	_button(menu_panel, "离开房间", Rect2(204, 324, 232, 32), func(): _confirm("leave"))
-
-	result_panel = _control(ui, Rect2(0, 0, 640, 480))
-	var shade := ColorRect.new()
-	shade.position = Vector2(145, 148)
-	shade.size = Vector2(350, 214)
-	shade.color = Color(0.04, 0.07, 0.06, 0.96)
-	result_panel.add_child(shade)
-	result_label = _label(result_panel, "", Rect2(155, 171, 330, 46), 28, GOLD)
-	result_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_label(result_panel, "本局对战结束", Rect2(179, 220, 282, 24), 12, PAPER).horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	rematch_button = _button(result_panel, "返回房间 / 再战", Rect2(188, 269, 264, 34), _rematch, true)
-	_button(result_panel, "离开房间", Rect2(188, 312, 264, 29), func(): _confirm("leave"))
-
-	confirm_dialog = ConfirmationDialog.new()
-	confirm_dialog.title = "确认离开？"
-	confirm_dialog.ok_button_text = "确认"
-	confirm_dialog.cancel_button_text = "取消"
-	confirm_dialog.confirmed.connect(_confirmed)
-	ui.add_child(confirm_dialog)
 
 func _layout_viewport() -> void:
 	viewport_size = get_viewport_rect().size
@@ -256,6 +96,8 @@ func _layout_viewport() -> void:
 	ui.scale = Vector2.ONE * ui_scale
 	field_scale = minf(viewport_size.x / game.WIDTH, viewport_size.y / game.HEIGHT)
 	field_origin = ((viewport_size - Vector2(game.WIDTH, game.HEIGHT) * field_scale) / 2.0).round()
+	%BattleReadouts.size = viewport_size / ui_scale
+	%BattleReadouts.scale = Vector2.ONE * ui_scale
 	hud_layer.size = viewport_size
 	# Overlay sizing follows the UI, not the world: compact on every aspect ratio.
 	menu_button.scale = Vector2.ONE * ui_scale
@@ -358,6 +200,8 @@ func _refresh() -> void:
 		if net.mode in ["lobby", "playing"]:
 			message = ""
 		last_mode = net.mode
+	%Header.visible = net.mode not in ["playing", "ended"]
+	%BattleReadouts.visible = not %Header.visible
 	entry_panel.visible = net.mode == "offline"
 	room_panel.visible = net.mode == "lobby"
 	connecting_panel.visible = net.mode == "connecting"
@@ -369,6 +213,7 @@ func _refresh() -> void:
 	status_label.text = message if not message.is_empty() else net.reason
 	if net.mode == "lobby":
 		var me: Dictionary = net.roster.get(net.local_id, {})
+		_update_room()
 		team_field.select(int(me.get("team", 0)))
 		ready_button.text = "房主已准备" if net.is_host() else ("取消准备" if me.get("ready", false) else "准备")
 		ready_button.disabled = net.is_host()
@@ -433,68 +278,35 @@ func _physics_process(dt: float) -> void:
 	for event in game.events:
 		play_sound(event)
 	game.events.clear()
+	if net.mode in ["playing", "ended"]:
+		_update_hud()
 	title_time += dt
 	if net.mode != last_mode:
 		_refresh()
 	queue_redraw()
 
-func text_at(value: String, pos: Vector2, size: int = 14, color: Color = WHITE) -> void:
-	draw_string(FONT, pos, value, HORIZONTAL_ALIGNMENT_LEFT, -1, size, color)
-
-func _fit_name(value: String, width: float, font_size: int) -> String:
-	if FONT.get_string_size(value, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size).x <= width:
-		return value
-	while not value.is_empty() and FONT.get_string_size(value + "..", HORIZONTAL_ALIGNMENT_LEFT, -1, font_size).x > width:
-		value = value.left(value.length() - 1)
-	return value + ".."
-
-func centered(value: String, y: float, size: int = 16, color: Color = WHITE, x: float = 320.0) -> void:
-	var width := FONT.get_string_size(value, HORIZONTAL_ALIGNMENT_LEFT, -1, size).x
-	text_at(value, Vector2(x - width / 2, y), size, color)
+func _update_room() -> void:
+	%RoomTitle.text = "对战房间 / {count} 人（最多 8 人）".format({"count": net.roster.size()})
+	%Port.text = "UDP {port}".format({"port": net.port})
+	for team: int in 2:
+		var area: Control = %Red if team == 0 else %Blue
+		var members: Array = net.roster.values().filter(func(player: Dictionary) -> bool: return player.team == team)
+		for i: int in 4:
+			var seat: Control = area.get_node("Seat%d" % (i+1))
+			var name_label: Label = seat.get_node("Player")
+			var ready_label: Label = seat.get_node("Ready")
+			if i >= members.size():
+				name_label.text = "+  等待玩家"
+				ready_label.text = ""
+				continue
+			var player: Dictionary = members[i]
+			name_label.text = ("> " if player.id == net.local_id else "") + str(player.name)
+			ready_label.text = "房主" if player.id == 1 else ("已准备" if player.ready else "未准备")
 
 func _draw() -> void:
 	draw_rect(Rect2(Vector2.ZERO, viewport_size), INK)
 	if net.mode in ["playing", "ended"]:
 		_draw_battle()
-		return
-	draw_set_transform(ui_origin, 0, Vector2.ONE * ui_scale)
-	text_at("铁鹰防线", Vector2(24, 30), 22, GOLD)
-	text_at("T A N K   B A T T L E", Vector2(166, 28), 11, MUTED)
-	text_at("团队联机", Vector2(518, 28), 11, PAPER)
-	if net.mode == "lobby":
-		_draw_room()
-	elif net.mode == "offline":
-		centered("红蓝团队对抗", 94, 30, GOLD)
-		centered("2–8 人实时联机 · 击毁敌方基地获胜", 125, 12, PAPER)
-		draw_rect(Rect2(134, 146, 372, 216), Color("1c2520"))
-		draw_rect(Rect2(134, 146, 372, 216), Color("475343"), false, 1)
-	draw_set_transform(Vector2.ZERO)
-
-func _draw_room() -> void:
-	text_at("对战房间 / %d 人（最多 8 人）" % net.roster.size(), Vector2(30, 71), 18, GOLD)
-	text_at("UDP %d" % net.port, Vector2(516, 70), 11, MUTED)
-	for team in range(2):
-		var x := 30 + team * 300
-		var color := RED if team == 0 else BLUE
-		draw_rect(Rect2(x, 89, 280, 29), color.darkened(0.7))
-		text_at("红队 / 北侧" if team == 0 else "蓝队 / 南侧", Vector2(x + 12, 109), 13, color)
-		var members: Array = []
-		for id in net.roster:
-			if net.roster[id].team == team:
-				members.append(net.roster[id])
-		for slot in range(4):
-			var y := 125 + slot * 43
-			draw_rect(Rect2(x, y, 280, 37), Color("202a24"))
-			if slot >= members.size():
-				text_at("+  等待玩家", Vector2(x + 13, y + 24), 12, Color("58675d"))
-				continue
-			var player: Dictionary = members[slot]
-			var is_local: bool = player.id == net.local_id
-			text_at(("> " if is_local else "  ") + _fit_name(str(player.name), 172, 13), Vector2(x + 10, y + 24), 13, WHITE if is_local else PAPER)
-			var ready: bool = player.get("ready", false)
-			text_at("房主" if player.id == 1 else ("已准备" if ready else "未准备"), Vector2(x + 222, y + 24), 10, GOLD if ready else MUTED)
-			if is_local:
-				draw_rect(Rect2(x, y, 280, 37), color, false, 1)
 
 func _draw_battle() -> void:
 	# No panel, decorative arena frame or letterbox: the same ground continues to
@@ -523,7 +335,7 @@ func _draw_battle() -> void:
 	for effect in game.effects:
 		draw_explosion(effect)
 	draw_set_transform(Vector2.ZERO)
-	draw_hud()
+
 
 func _draw_ground() -> void:
 	var start := Vector2i((-field_origin / field_scale / 16.0).floor()) - Vector2i.ONE
@@ -650,26 +462,17 @@ func draw_explosion(effect: Dictionary) -> void:
 	if progress < 0.5:
 		draw_rect(Rect2(pos - Vector2(3, 3), Vector2(6, 6)), WHITE)
 
-func draw_hud() -> void:
-	# Two small translucent readouts float on the field, not in a side panel.
-	var screen := viewport_size / ui_scale
-	draw_set_transform(Vector2.ZERO, 0, Vector2.ONE * ui_scale)
-	for team in range(2):
-		if game.bases.size() <= team:
-			continue
+func _update_hud() -> void:
+	for team: int in game.bases.size():
 		var base: Dictionary = game.bases[team]
-		var color := RED if team == 0 else BLUE
-		var x := 14.0 if team == 0 else screen.x - 152.0
-		draw_rect(Rect2(x, 12, 138, 42), Color(0.03, 0.06, 0.04, 0.58))
-		text_at("红方基地" if team == 0 else "蓝方基地", Vector2(x + 9, 30), 12, color)
-		text_at("%d / %d" % [base.hp, game.BASE_HP], Vector2(x + 101, 30), 11, PAPER)
-		for i in range(game.BASE_HP):
-			draw_rect(Rect2(x + 9 + i * 24, 39, 21, 5), color if i < base.hp else Color("354039"))
+		var readout: Control = %RedBase if team == 0 else %BlueBase
+		readout.get_node("Health").text = "{hp} / {max}".format({"hp": base.hp, "max": game.BASE_HP})
+		for i: int in game.BASE_HP:
+			readout.get_node("Point%d" % (i+1)).modulate = Color.WHITE if i < base.hp else Color("354039")
 	var me: Dictionary = game.players.get(net.local_id, {})
-	if not me.is_empty() and float(me.get("respawn", -1.0)) >= 0:
-		var value := "等待出生位置" if me.respawn <= 0.02 else "复活 %.1f 秒" % maxf(0, me.respawn)
-		centered(value, screen.y - 23, 15, GOLD, screen.x / 2)
-	draw_set_transform(Vector2.ZERO)
+	%Respawn.visible = not me.is_empty() and float(me.respawn) >= 0
+	if %Respawn.visible:
+		%Respawn.text = "等待出生位置" if me.respawn <= 0.02 else "复活 %.1f 秒" % me.respawn
 
 func synthesize(kind: String) -> AudioStreamWAV:
 	var seconds := 0.08

@@ -15,6 +15,7 @@ const PROTOCOL := 2 # Rectangular 736 × 416 terrain encoding; reject older squa
 const SNAPSHOT_INTERVAL := 3 # 60 Hz / 3 = 20 snapshots / second.
 const INPUT_TIMEOUT_MS := 300
 const CONNECT_TIMEOUT_MS := 8000
+var battlefield_layout: Node2D
 var game = BattleModel.new()
 var roster: Dictionary = {}
 var mode := "offline"
@@ -119,7 +120,7 @@ func leave_room(show_message: bool = true) -> void:
 	_limits.clear()
 	_pending.clear()
 	_rejecting.clear()
-	game = BattleModel.new()
+	game = BattleModel.new(battlefield_layout)
 	local_id = 0
 	_seq = 0
 	_frame = 0
@@ -338,7 +339,7 @@ func return_to_lobby() -> void:
 		return
 	epoch += 1
 	mode = "lobby"
-	game = BattleModel.new()
+	game = BattleModel.new(battlefield_layout)
 	_inputs.clear()
 	for id in roster:
 		roster[id].ready = id == 1
@@ -429,7 +430,7 @@ func _room_state(packet: Dictionary) -> void:
 	mode = packet.mode
 	reason = packet.reason
 	if mode == "lobby":
-		game = BattleModel.new()
+		game = BattleModel.new(battlefield_layout)
 		_last_snapshot_tick = -1
 	changed.emit()
 
