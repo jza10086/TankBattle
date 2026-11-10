@@ -1,8 +1,8 @@
 {
   "manifest_version": 2,
   "core_api_major": 5,
-  "package_version": "1.0.2",
-  "id": "godot_party_default_tank_battle",
+  "package_version": "1.0.3",
+  "id": "gp_tank_battle",
   "name": "铁鹰防线",
   "kind": "minigame",
   "supported_systems": ["windows"],

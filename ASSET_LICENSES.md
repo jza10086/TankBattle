@@ -1,4 +1,4 @@
-# godot_party_default_tank_battle 许可范围
+# gp_tank_battle 许可范围
 
 声明日期：2026-11-08；声明人：项目所有者 jza10086。依据项目所有者本次明确授权。
 
