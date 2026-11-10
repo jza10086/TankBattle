@@ -1,10 +1,11 @@
 {
   "manifest_version": 2,
   "core_api_major": 5,
-  "package_version": "1.0.1",
+  "package_version": "1.0.2",
   "id": "godot_party_default_tank_battle",
   "name": "铁鹰防线",
   "kind": "minigame",
+  "supported_systems": ["windows"],
   "introduction": "独立 ENet 红蓝坦克对抗，等待接入派对房间。",
   "entry": "party_round.tscn",
   "player_counts": [
