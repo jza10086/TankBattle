@@ -1,7 +1,7 @@
 {
   "manifest_version": 2,
-  "core_api_major": 4,
-  "package_version": "1.0.0",
+  "core_api_major": 5,
+  "package_version": "1.0.1",
   "id": "godot_party_default_tank_battle",
   "name": "铁鹰防线",
   "kind": "minigame",
