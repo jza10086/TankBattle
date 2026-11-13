@@ -1,7 +1,7 @@
 {
   "manifest_version": 2,
-  "core_api_major": 5,
-  "package_version": "1.0.3",
+  "core_api_major": 6,
+  "package_version": "1.0.4",
   "id": "gp_tank_battle",
   "name": "铁鹰防线",
   "kind": "minigame",
