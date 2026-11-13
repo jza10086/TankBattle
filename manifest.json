@@ -1,31 +1,7 @@
 {
-  "manifest_version": 2,
-  "core_api_major": 6,
-  "package_version": "1.0.4",
-  "id": "gp_tank_battle",
   "name": "铁鹰防线",
   "kind": "minigame",
-  "supported_systems": ["windows"],
-  "introduction": "独立 ENet 红蓝坦克对抗，等待接入派对房间。",
-  "entry": "party_round.tscn",
-  "player_counts": [
-    2,
-    3,
-    4,
-    5,
-    6,
-    7,
-    8
-  ],
-  "playable": false,
-  "adapters": [],
-  "localization": {
-    "supported_locales": [
-      "zh_Hans"
-    ],
-    "fallback_locale": "zh_Hans",
-    "translations": {
-      "zh_Hans": "i18n/zh_Hans.po"
-    }
-  }
+  "package_version": "0.0.1",
+  "framework_version": "0.0.1",
+  "remark": ""
 }

@@ -1,6 +1,9 @@
 [gd_scene format=3]
 
+[ext_resource type="Script" path="res://games/minigame/gp_tank_battle/entry_rules.gd" id="entry_rules"]
+
 [node name="PendingRound" type="CenterContainer"]
+script = ExtResource("entry_rules")
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
