@@ -66,23 +66,18 @@ tick 常量由秒数与 `TICK_RATE` 自动向上取整；修改秒数即可同�
 - `tests/test_battle.gd` / `tests/run_tests.sh`：确定性规则回归。
 - `tests/network_peer.gd` / `tests/run_network_tests.py`：真实多进程 ENet 回归（不是模拟网络）。
 - `tests/native_capture.gd` / `tests/native_peer.gd`：已有桌面上的真实双进程原生渲染/交互检查。
-- `docs/QA.md`：实际验证覆盖与限制。
+- `doc/gp_tank_battle_qa.md`：实际验证覆盖与限制。
 
-## 回归测试
+## 验证
 
-```sh
-GODOT_BIN=/path/to/godot tests/run_tests.sh
-GODOT_BIN=/path/to/godot python3 tests/run_network_tests.py
-```
-
-原生截图需要现有桌面显示器，不能用 `--headless`：
-
-```sh
-TANK_CAPTURE_DIR=/absolute/writable/output godot --path . --script res://tests/native_capture.gd
-```
-
-测试脚本的预设输入仅用于测试人的操作，不会成为游戏里的 AI。测试输出/截图不打包进源码。
+最近记录与未完成验收见 [gp_tank_battle 开发记录](gp_tank_battle_development.md)。按本次改动选取必要检查；旧测试命令不作为当前入口。
 
 ## 许可
 
-原创代码、地图、程序化美术及音效使用 [MIT License](LICENSE)；不包含原经典游戏 ROM、贴图或音乐，与原游戏及权利人无关联。界面字体为 Noto Sans CJK SC 子集，采用 SIL Open Font License，见 `assets/fonts/LICENSE.txt`。
+原创代码、地图、程序化美术及音效使用 [MIT License](../LICENSE)；不包含原经典游戏 ROM、贴图或音乐，与原游戏及权利人无关联。界面字体为 Noto Sans CJK SC 子集，采用 SIL Open Font License，见 `assets/fonts/LICENSE.txt`。
+
+## 包内开发文档
+
+未带 `res://` 的源码路径以本包根目录为基准。
+
+- [M24 铁鹰防线原型　B，正式接入另立任务](gp_tank_battle_development.md)
