@@ -66,11 +66,11 @@ tick 常量由秒数与 `TICK_RATE` 自动向上取整；修改秒数即可同�
 - `tests/test_battle.gd` / `tests/run_tests.sh`：确定性规则回归。
 - `tests/network_peer.gd` / `tests/run_network_tests.py`：真实多进程 ENet 回归（不是模拟网络）。
 - `tests/native_capture.gd` / `tests/native_peer.gd`：已有桌面上的真实双进程原生渲染/交互检查。
-- `doc/gp_tank_battle_qa.md`：实际验证覆盖与限制。
+- `doc/GP_tank_battle_qa.md`：实际验证覆盖与限制。
 
 ## 验证
 
-最近记录与未完成验收见 [gp_tank_battle 开发记录](gp_tank_battle_development.md)。按本次改动选取必要检查；旧测试命令不作为当前入口。
+最近记录与未完成验收见 [GP_tank_battle 开发记录](GP_tank_battle_development.md)。按本次改动选取必要检查；旧测试命令不作为当前入口。
 
 ## 许可
 
@@ -80,4 +80,4 @@ tick 常量由秒数与 `TICK_RATE` 自动向上取整；修改秒数即可同�
 
 未带 `res://` 的源码路径以本包根目录为基准。
 
-- [M24 铁鹰防线原型　B，正式接入另立任务](gp_tank_battle_development.md)
+- [M24 铁鹰防线原型　B，正式接入另立任务](GP_tank_battle_development.md)

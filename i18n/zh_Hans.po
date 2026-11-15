@@ -9,3 +9,6 @@ msgstr "独立 ENet 红蓝坦克对抗，等待接入派对房间。"
 
 msgid "铁鹰防线"
 msgstr "铁鹰防线"
+
+msgid "package.name"
+msgstr "铁鹰防线"
